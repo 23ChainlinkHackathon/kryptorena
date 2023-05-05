@@ -22,6 +22,7 @@ contract kryptorena {
     //storing the battle data
 
     struct Game {
+        GameStatus gameStatus;
         string name; // to store name of battle
         bytes32 battleHash; //store the hash of battle name, dont really know the use case...but might be needed later
         address[2] playersInBattle; // to store the players in this battle
@@ -73,9 +74,7 @@ contract kryptorena {
 
     // more functions
 
-    function playerRegistration() public {
-
-    }
+    
     
     function generateRandomNumber() public {
 
@@ -85,9 +84,7 @@ contract kryptorena {
 
     }
 
-    function createGame() public { // battle
-
-    }
+    
 
     function joinGame() public {
 
@@ -139,6 +136,7 @@ contract kryptorena {
         bytes32 hashOfBattle = keccak256(abi.encode(_name));
         
         Game memory _game = Game(
+            GameStatus.PENDING,
             _name,
             hashOfBattle,
             [msg.sender, address(0)],
@@ -154,8 +152,59 @@ contract kryptorena {
 
 
     }
+
+    function getGame(string memory _name) public view returns (Game memory) {
+        require(isGame(_name), "Battle doesn't exist!");
+        return games[gameInfo[_name]];
+    }
     
 
+    function joinGame(string memory _name) external returns (Battle memory) {
+        Game memory _game = getBattle(_name);
+
+        require(_battle.battleStatus == BattleStatus.PENDING, "Battle already started!"); // Require that battle has not started
+        require(_battle.players[0] != msg.sender, "Only player two can join a battle"); // Require that player 2 is joining the battle
+        require(!getPlayer(msg.sender).inBattle, "Already in battle"); // Require that player is not already in a battle
+    
+        _battle.battleStatus = BattleStatus.STARTED;
+        _battle.players[1] = msg.sender;
+        updateBattle(_name, _battle);
+
+        players[playerInfo[_battle.players[0]]].inBattle = true;
+        players[playerInfo[_battle.players[1]]].inBattle = true;
+
+        emit NewBattle(_battle.name, _battle.players[0], msg.sender); // Emits NewBattle event
+        return _battle;
+    }
+
+    
+    function quitGame(string memory _gameName) public {
+        Game memory _game = getGame(_gameName);
+        require(_game.players[0] == msg.sender || _game.players[1] =- msg.sender, "You are not in this game sir");
+        _game.players[0] == msg.sender ? _endGame(_game.players[1], _game) : _endGame(_game.players[0], _game);
+    }
+
+    function endGame(address lastUser, Game memory _game) internal returns (Game memory) {
+        require(_game.GameStatus != GameStatus.ENDED, "The game has ended");
+        _game.gameStatus = GameStatus.ENDED;
+        _game.winner = lastUser;
+        updateGame(_game.name, _game);
+
+        uint player1 = playerInfo[_game.players[0]];
+        uint player2 = playerInfo[_game.players[1]];
+
+        players[player1].inGame = false;
+        players[player1].playerHealth = 10;
+        players[player2].inGame = false;
+        players[player2].playerHealth = 10;
+        
+        address _gameLoser = lastUser == _game.players[0] ? _game.players[1] : _game.players[0];
+
+        emit GameEnded(_game.name, lastUser, _gameLoser); // Emits BattleEnded event
+
+        return _game;
+        
+    }
     
     
     
