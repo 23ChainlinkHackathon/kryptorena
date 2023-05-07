@@ -7,6 +7,7 @@ import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <BrowserRouter>
+  {/* <PlayerOnboarding /> */}
     <Routes>
       <Route path="/" element={<Home />} />
     </Routes>

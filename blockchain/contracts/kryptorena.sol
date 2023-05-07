@@ -163,8 +163,8 @@ contract kryptorena {
     function joinGame(string memory _name) external returns (Game memory) {
         Game memory _game = getGame(_name);
 
-        require(_game.battleStatus == GameStatus.PENDING, "Battle already started!"); // Require that battle has not started
-        require(_game.players[0] != msg.sender, "Only player two can join a battle"); // Require that player 2 is joining the battle
+        require(_game.gameStatus == GameStatus.PENDING, "Battle already started!"); // Require that battle has not started
+        require(_game.playersInBattle[0] != msg.sender, "Only player two can join a battle"); // Require that player 2 is joining the battle
         require(!getPlayer(msg.sender).inBattle, "Already in battle"); // Require that player is not already in a battle
     
         _game.battleStatus = GameStatus.STARTED;
@@ -174,7 +174,7 @@ contract kryptorena {
         players[playerInfo[_game.players[0]]].inBattle = true;
         players[playerInfo[_game.players[1]]].inBattle = true;
 
-        emit NewGame(_game.name, _game.players[0], msg.sender); // Emits NewBattle event
+        emit newGame(_game.name, _game.players[0], msg.sender); // Emits NewBattle event
         return _game;
     }
 
@@ -182,7 +182,7 @@ contract kryptorena {
     function quitGame(string memory _gameName) public {
         Game memory _game = getGame(_gameName);
         require(_game.players[0] == msg.sender || _game.players[1] =- msg.sender, "You are not in this game sir");
-        _game.players[0] == msg.sender ? _endGame(_game.players[1], _game) : _endGame(_game.players[0], _game);
+        _game.players[0] == msg.sender ? endGame(_game.players[1], _game) : endGame(_game.players[0], _game);
     }
 
     function endGame(address lastUser, Game memory _game) internal returns (Game memory) {
@@ -201,7 +201,7 @@ contract kryptorena {
         
         address _gameLoser = lastUser == _game.players[0] ? _game.players[1] : _game.players[0];
 
-        emit GameEnded(_game.name, lastUser, _gameLoser); // Emits BattleEnded event
+        emit gameEnded(_game.name, lastUser, _gameLoser); // Emits BattleEnded event
 
         return _game;
         
