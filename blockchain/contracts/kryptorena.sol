@@ -4,6 +4,7 @@ pragma solidity ^0.8.16;
 //this is a structured contract, not final 
 contract kryptorena {
 
+
     enum GameStatus { STARTED, ENDED, PENDING} // describes the state of game
 
     struct BattleId {
@@ -35,7 +36,7 @@ contract kryptorena {
     Game[] public games; // store all games 
 
     mapping(address => uint) public playerInfo;
-    mapping(string => uint) public battleInfo;
+    mapping(string => uint) public gameInfo;
     // general functions
     // isPlayer, getPlayer, allPlayers, 
     function isPlayer(address _address) public view returns (bool) {
@@ -52,7 +53,7 @@ contract kryptorena {
 
     }
     function isGame(string memory _name) public view returns (bool) {
-        if(battleInfo[_name] == 0) {
+        if(gameInfo[_name] == 0) {
             return false;
         } else {
             return true;
@@ -145,7 +146,7 @@ contract kryptorena {
         );
 
         uint _id = games.length;
-        battleInfo[_name] = _id;
+        gameInfo[_name] = _id;
         games.push(_game);
 
         return _game;
@@ -159,22 +160,22 @@ contract kryptorena {
     }
     
 
-    function joinGame(string memory _name) external returns (Battle memory) {
-        Game memory _game = getBattle(_name);
+    function joinGame(string memory _name) external returns (Game memory) {
+        Game memory _game = getGame(_name);
 
-        require(_battle.battleStatus == BattleStatus.PENDING, "Battle already started!"); // Require that battle has not started
-        require(_battle.players[0] != msg.sender, "Only player two can join a battle"); // Require that player 2 is joining the battle
+        require(_game.battleStatus == GameStatus.PENDING, "Battle already started!"); // Require that battle has not started
+        require(_game.players[0] != msg.sender, "Only player two can join a battle"); // Require that player 2 is joining the battle
         require(!getPlayer(msg.sender).inBattle, "Already in battle"); // Require that player is not already in a battle
     
-        _battle.battleStatus = BattleStatus.STARTED;
-        _battle.players[1] = msg.sender;
-        updateBattle(_name, _battle);
+        _game.battleStatus = GameStatus.STARTED;
+        _game.players[1] = msg.sender;
+        updateGame(_name, _game);
 
-        players[playerInfo[_battle.players[0]]].inBattle = true;
-        players[playerInfo[_battle.players[1]]].inBattle = true;
+        players[playerInfo[_game.players[0]]].inBattle = true;
+        players[playerInfo[_game.players[1]]].inBattle = true;
 
-        emit NewBattle(_battle.name, _battle.players[0], msg.sender); // Emits NewBattle event
-        return _battle;
+        emit NewGame(_game.name, _game.players[0], msg.sender); // Emits NewBattle event
+        return _game;
     }
 
     
@@ -205,11 +206,5 @@ contract kryptorena {
         return _game;
         
     }
-    
-    
-    
-    
-
-
     
 }
