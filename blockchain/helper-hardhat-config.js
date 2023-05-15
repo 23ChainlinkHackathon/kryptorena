@@ -11,6 +11,13 @@ const networkConfig = {
         mintFee: ethers.utils.parseEther("0.01"),
         priceFeedAddress: "0xD4a33860578De61DBAbDc8BFdb98FD742fA7028e", //ETH/USD
     },
+    43113: {
+        name: "fuji",
+        vrfCoordinatorV2: "0x2eD832Ba664535e5886b75D64C46EB9a228C2610",
+        subscriptionId: "675",
+        gasLane: "0x354d2f95da55398f44b7cff77da56283d9c6c829a4bdf1bbcaf2ad6a4d081f61",
+        callbackGasLimit: "2500000",
+    },
     31337: {
         name: "hardhat",
         TOKEN_URI:

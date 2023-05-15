@@ -10,6 +10,8 @@ require("dotenv").config()
 const GOERLI = process.env.GOERLI_URL || ""
 const PRIVATE_KEY = process.env.PRIVATE_KEY || ""
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || ""
+const FUJI = process.env.FUJI_URL || ""
+const FUJI_PRIVATE_KEY = process.env.FUJI_PRIVATE_KEY || ""
 module.exports = {
     defaultNetwork: "hardhat",
     networks: {
@@ -19,6 +21,12 @@ module.exports = {
             chainId: 5,
             blockConfirmations: 2,
         },
+        fuji: {
+            url: FUJI,
+            accounts:[FUJI_PRIVATE_KEY],
+            chainId: 43113,
+            blockConfirmations: 1,
+        }
     },
     localhost: {
         url: "http://127.0.0.1:8545/",

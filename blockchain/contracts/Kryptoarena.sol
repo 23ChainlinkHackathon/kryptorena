@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity ^0.8.16;
 
-//this is a structured contract, not final
-contract Kryptorena {
+import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
+import "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
+import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
+
+contract kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
     enum GameStatus {
         STARTED,
         ENDED,
@@ -34,59 +36,6 @@ contract Kryptorena {
         address winner; // storing the address of winner
     }
 
-    Player[] public players; // store all players
-    BattleId[] public battleId; // store all game ids
-    Game[] public games; // store all games
-
-    mapping(address => uint) public playerInfo;
-    mapping(string => uint) public gameInfo;
-
-    // general functions
-    // isPlayer, getPlayer, allPlayers,
-    function isPlayer(address _address) public view returns (bool) {
-        if (playerInfo[_address] == 0) {
-            return false;
-        } else {
-            return true;
-        }
-    }
-
-    function getPlayer(address _address) public {}
-
-    function getAllPlayer(address _address) public {}
-
-    function isGame(string memory _name) public view returns (bool) {
-        if (gameInfo[_name] == 0) {
-            return false;
-        } else {
-            return true;
-        }
-    }
-
-    function getGame(address _address) public {}
-
-    function getAllGame(address _address) public {}
-
-    function updateGame() public {}
-
-    // events
-
-    // more functions
-
-    function generateRandomNumber() public {}
-
-    function generateRandomGameId() public {}
-
-    function joinGame() public {}
-
-    function aodBattle() public {
-        // to get if user chosed attack or defence
-    }
-
-    function regAod() public {
-        // to store the choice on-chain
-    }
-
     struct Play {
         uint index;
         uint choice;
@@ -95,13 +44,42 @@ contract Kryptorena {
         uint defence;
     }
 
+    Player[] public players; // store all players
+    BattleId[] public battleId; // store all game ids
+    Game[] public games; // store all games
+
+    mapping(address => uint) public playerInfo;
+    mapping(string => uint) public gameInfo;
+
+    //Chainlink VRF Variables
+    VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
+    uint64 private immutable i_subscriptionId;
+    bytes32 private immutable i_gasLane;
+    uint32 private immutable i_callbackGasLimit;
+    uint16 private constant REQUEST_CONFIRMATIONS = 3;
+    uint32 private constant NUM_WORDS = 1;
+
     // events
 
     event newPlayer(address indexed owner, string name);
     event newGame(string battleName, address indexed player1, address indexed player2);
     event gameEnded(string battleName, address indexed winner, address indexed defeated);
 
+    constructor(
+        address vrfCoordinatorV2,
+        uint64 subscriptionId,
+        bytes32 gasLane,
+        uint32 callbackGasLimit,
+        string[] memory cardTokenUris
+    ) VRFConsumerBaseV2(vrfCoordinatorV2) ConfirmedOwner(msg.sender) {
+        i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
+        i_subscriptionId = subscriptionId;
+        i_gasLane = gasLane;
+        i_callbackGasLimit = callbackGasLimit;
+    }
+
     // register the player
+
     function registerNewPlayer(string memory _name) external {
         require(!isPlayer(msg.sender), "This address already registered");
 
@@ -137,11 +115,6 @@ contract Kryptorena {
         return _game;
     }
 
-    function getGame(string memory _name) public view returns (Game memory) {
-        require(isGame(_name), "Battle doesn't exist!");
-        return games[gameInfo[_name]];
-    }
-
     function joinGame(string memory _name) external returns (Game memory) {
         Game memory _game = getGame(_name);
 
@@ -160,6 +133,30 @@ contract Kryptorena {
         return _game;
     }
 
+    function getPlayer(address _address) public {}
+
+    function getAllPlayer(address _address) public {}
+
+    function getGame(address _address) public {}
+
+    function getAllGame(address _address) public {}
+
+    function updateGame() public {}
+
+    function generateRandomNumber() public {}
+
+    function generateRandomGameId() public {}
+
+    function joinGame() public {}
+
+    function aodBattle() public {
+        // to get if user chosed attack or defence
+    }
+
+    function regAod() public {
+        // to store the choice on-chain
+    }
+
     function quitGame(string memory _gameName) public {
         Game memory _game = getGame(_gameName);
         require(
@@ -171,6 +168,11 @@ contract Kryptorena {
             ? endGame(_game.players[1], _game)
             : endGame(_game.players[0], _game);
     }
+
+    function fulfillRandomWords(
+        uint256 requestId,
+        uint256[] memory randomWords
+    ) internal override {}
 
     function endGame(address lastUser, Game memory _game) internal returns (Game memory) {
         require(_game.GameStatus != GameStatus.ENDED, "The game has ended");
@@ -191,5 +193,26 @@ contract Kryptorena {
         emit gameEnded(_game.name, lastUser, _gameLoser); // Emits BattleEnded event
 
         return _game;
+    }
+
+    function isPlayer(address _address) public view returns (bool) {
+        if (playerInfo[_address] == 0) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    function getGame(string memory _name) public view returns (Game memory) {
+        require(isGame(_name), "Battle doesn't exist!");
+        return games[gameInfo[_name]];
+    }
+
+    function isGame(string memory _name) public view returns (bool) {
+        if (gameInfo[_name] == 0) {
+            return false;
+        } else {
+            return true;
+        }
     }
 }
