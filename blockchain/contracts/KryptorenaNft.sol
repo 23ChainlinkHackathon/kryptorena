@@ -18,6 +18,8 @@ contract KryptorenaNft is VRFConsumerBaseV2, ConfirmedOwner, ERC721URIStorage {
     //NFT variables
     uint256 private s_tokenCounter;
     string[] internal s_cardTokenUris;
+    uint256 private immutable i_max_amount;
+
 
     //VRF Helper
     /**
@@ -49,6 +51,8 @@ contract KryptorenaNft is VRFConsumerBaseV2, ConfirmedOwner, ERC721URIStorage {
         i_gasLane = gasLane;
         i_callbackGasLimit = callbackGasLimit;
         s_cardTokenUris = cardTokenUris;
+        i_Max_Amount = s_NFTTokenUris.length;
+
     }
 
     /**
@@ -77,11 +81,12 @@ contract KryptorenaNft is VRFConsumerBaseV2, ConfirmedOwner, ERC721URIStorage {
      */
 
     function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override {
-        address cardOwner = s_requestIdToSender[requestId];
+        address nftOwner = s_requestIdToSender[requestId];
+        uint256 randomNumber = randomWords[0] % i_max_amount;
         uint256 newTokenId = s_tokenCounter;
         s_tokenCounter = s_tokenCounter + 1;
-        _safeMint(cardOwner, newTokenId);
-        _setTokenURI(newTokenId, s_cardTokenUris[0]);
+        _safeMint(nftOwner, newTokenId);
+        _setTokenURI(newTokenId, s_NFTTokenUris[randomNumber]);
     }
 
     function getTokenCounter() public view returns (uint256) {
