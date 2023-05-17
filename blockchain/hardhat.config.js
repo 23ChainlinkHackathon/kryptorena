@@ -23,10 +23,10 @@ module.exports = {
         },
         fuji: {
             url: FUJI,
-            accounts:[FUJI_PRIVATE_KEY],
+            accounts: [FUJI_PRIVATE_KEY],
             chainId: 43113,
             blockConfirmations: 1,
-        }
+        },
     },
     localhost: {
         url: "http://127.0.0.1:8545/",
@@ -59,5 +59,8 @@ module.exports = {
         enabled: true,
         outputFile: "gas-report.txt",
         noColors: true,
+    },
+    mocha: {
+        timeout: 200000,
     },
 }
