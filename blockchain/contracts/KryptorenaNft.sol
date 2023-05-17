@@ -29,6 +29,7 @@ contract KryptorenaNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
      */
     mapping(uint256 => address) public s_requestIdToSender;
     mapping(address => string) public s_addressToUri;
+    mapping(address => bool) public hasMintedNFT;
 
     //Events
     event NftRequested(uint256 indexed requestId, address requester);
@@ -37,6 +38,7 @@ contract KryptorenaNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
     //Errors
     error KryptorenaNft__NeedMoreAVAXSent();
     error Kryptorena__TransferFailed();
+    error KryptorenaNft__AlreadyMintedNft();
 
     /**
      * @dev Sets the contract's VRF coordinator, subscription ID, gas lane, callback gas limit, and card token URIs.
@@ -63,6 +65,8 @@ contract KryptorenaNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
         i_mintFee = mintFee;
     }
 
+    receive() external payable {}
+
     /**
      * @notice Requests a random number to use for creating a new NFT.
      * @dev Sends a VRF request to the coordinator contract and associates the request ID with the sender's address. Emits an event as well.
@@ -72,6 +76,9 @@ contract KryptorenaNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
     function requestNft() public payable returns (uint256 requestId) {
         if (msg.value < i_mintFee) {
             revert KryptorenaNft__NeedMoreAVAXSent();
+        }
+        if (hasMintedNFT[msg.sender]) {
+            revert KryptorenaNft__AlreadyMintedNft();
         }
         requestId = i_vrfCoordinator.requestRandomWords(
             i_gasLane,
@@ -96,6 +103,7 @@ contract KryptorenaNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
         uint256 newTokenId = s_tokenCounter;
         s_tokenCounter = s_tokenCounter + 1;
         uint256 randomNumber = randomWords[0] % i_NFTTokenUriCount;
+        hasMintedNFT[nftOwner] = true;
         s_addressToUri[nftOwner] = s_nftTokenUris[randomNumber];
         _safeMint(nftOwner, newTokenId);
         _setTokenURI(newTokenId, s_nftTokenUris[randomNumber]);
