@@ -1,12 +1,13 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.7;
+pragma solidity ^0.8.8;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
-import "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
+import "hardhat/console.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract KryptorenaNft is VRFConsumerBaseV2, ConfirmedOwner, ERC721URIStorage {
+contract KryptorenaNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
     //Chainlink VRF Variables
     VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
     uint64 private immutable i_subscriptionId;
@@ -17,19 +18,25 @@ contract KryptorenaNft is VRFConsumerBaseV2, ConfirmedOwner, ERC721URIStorage {
 
     //NFT variables
     uint256 private s_tokenCounter;
-    string[] internal s_cardTokenUris;
-    uint256 private immutable i_max_amount;
-
+    string[] internal s_nftTokenUris;
+    uint256 private immutable i_NFTTokenUriCount;
+    uint256 private immutable i_mintFee;
 
     //VRF Helper
     /**
-     * @dev Keeps track of address requesting VRF to mint NFT.
+     * @notice s_requestIdToSender keeps track of address requesting VRF to mint NFT.
+     * s_addressToUri keeps track of addresses and what NFT URI they minted.
      */
     mapping(uint256 => address) public s_requestIdToSender;
+    mapping(address => string) public s_addressToUri;
 
     //Events
     event NftRequested(uint256 indexed requestId, address requester);
-    event NftMinted(uint256[2] attack_defense, address minter);
+    event NftMinted(string tokenUri, address minter);
+
+    //Errors
+    error KryptorenaNft__NeedMoreAVAXSent();
+    error Kryptorena__TransferFailed();
 
     /**
      * @dev Sets the contract's VRF coordinator, subscription ID, gas lane, callback gas limit, and card token URIs.
@@ -37,22 +44,23 @@ contract KryptorenaNft is VRFConsumerBaseV2, ConfirmedOwner, ERC721URIStorage {
      * @param subscriptionId The ID of the VRF subscription to use.
      * @param gasLane The gas lane to use for VRF requests.
      * @param callbackGasLimit The gas limit to use for VRF request callbacks.
-     * @param cardTokenUris An array of URIs to use for the contract's card tokens.
+     * @param NFTTokenUris An array of URIs to use for the contract's card tokens.
      */
     constructor(
         address vrfCoordinatorV2,
         uint64 subscriptionId,
         bytes32 gasLane,
         uint32 callbackGasLimit,
-        string[] memory cardTokenUris
-    ) VRFConsumerBaseV2(vrfCoordinatorV2) ConfirmedOwner(msg.sender) ERC721("Kryptorena", "KTA") {
+        string[] memory NFTTokenUris,
+        uint256 mintFee
+    ) VRFConsumerBaseV2(vrfCoordinatorV2) ERC721("MyNFT", "NFT") {
         i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
         i_subscriptionId = subscriptionId;
         i_gasLane = gasLane;
         i_callbackGasLimit = callbackGasLimit;
-        s_cardTokenUris = cardTokenUris;
-        i_Max_Amount = s_NFTTokenUris.length;
-
+        s_nftTokenUris = NFTTokenUris;
+        i_NFTTokenUriCount = s_nftTokenUris.length;
+        i_mintFee = mintFee;
     }
 
     /**
@@ -62,6 +70,9 @@ contract KryptorenaNft is VRFConsumerBaseV2, ConfirmedOwner, ERC721URIStorage {
      */
 
     function requestNft() public payable returns (uint256 requestId) {
+        if (msg.value < i_mintFee) {
+            revert KryptorenaNft__NeedMoreAVAXSent();
+        }
         requestId = i_vrfCoordinator.requestRandomWords(
             i_gasLane,
             i_subscriptionId,
@@ -82,18 +93,64 @@ contract KryptorenaNft is VRFConsumerBaseV2, ConfirmedOwner, ERC721URIStorage {
 
     function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override {
         address nftOwner = s_requestIdToSender[requestId];
-        uint256 randomNumber = randomWords[0] % i_max_amount;
         uint256 newTokenId = s_tokenCounter;
         s_tokenCounter = s_tokenCounter + 1;
+        uint256 randomNumber = randomWords[0] % i_NFTTokenUriCount;
+        s_addressToUri[nftOwner] = s_nftTokenUris[randomNumber];
         _safeMint(nftOwner, newTokenId);
-        _setTokenURI(newTokenId, s_NFTTokenUris[randomNumber]);
+        _setTokenURI(newTokenId, s_nftTokenUris[randomNumber]);
+        emit NftMinted(s_nftTokenUris[randomNumber], nftOwner);
+    }
+
+    function withdraw() public onlyOwner {
+        uint256 amount = address(this).balance;
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        if (!success) {
+            revert Kryptorena__TransferFailed();
+        }
     }
 
     function getTokenCounter() public view returns (uint256) {
         return s_tokenCounter;
     }
 
-    function getCardUri(uint256 index) public view returns (string memory) {
-        return s_cardTokenUris[index];
+    function getNftUriAtIndex(uint256 index) public view returns (string memory) {
+        return s_nftTokenUris[index];
+    }
+
+    function getNftUriList() public view returns (string[] memory) {
+        return s_nftTokenUris;
+    }
+
+    function getNftTokenUriCount() public view returns (uint256) {
+        return i_NFTTokenUriCount;
+    }
+
+    function getRequestIdToSender(uint256 index) public view returns (address) {
+        return s_requestIdToSender[index];
+    }
+
+    function getSubscriptionId() public view returns (uint64) {
+        return i_subscriptionId;
+    }
+
+    function getCallbackGasLimit() public view returns (uint32) {
+        return i_callbackGasLimit;
+    }
+
+    function getGasLane() public view returns (bytes32) {
+        return i_gasLane;
+    }
+
+    function getUriOfAddress(address _address) public view returns (string memory) {
+        return s_addressToUri[_address];
+    }
+
+    function getRequestConfirmations() public pure returns (uint16) {
+        return REQUEST_CONFIRMATIONS;
+    }
+
+    function getNumWords() public pure returns (uint32) {
+        return NUM_WORDS;
     }
 }
