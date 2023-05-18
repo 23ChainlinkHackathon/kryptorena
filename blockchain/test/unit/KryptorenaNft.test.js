@@ -1,7 +1,7 @@
 const { assert, expect } = require("chai")
 const { network, deployments, ethers, getNamedAccounts } = require("hardhat")
 const { developmentChains, networkConfig } = require("../../helper-hardhat-config")
-const { tokenUris, subscriptionId } = require("/home/robitu/personal/MY_NFT/deploy/01-deploy-MyNft")
+const { tokenUris } = require("/home/robitu/personal/MY_NFT/deploy/01-deploy-MyNft")
 
 !developmentChains.includes(network.name)
     ? describe.skip
@@ -87,6 +87,27 @@ const { tokenUris, subscriptionId } = require("/home/robitu/personal/MY_NFT/depl
                       kryptorena,
                       "NftRequested"
                   )
+              })
+              it("should revert with error if user has already minted NFT", async () => {
+                  await new Promise(async (resolve, reject) => {
+                      kryptorena.once("NftMinted", async () => {
+                          try {
+                              await expect(
+                                  kryptorena.requestNft({ value: mintFee })
+                              ).to.be.revertedWith("KryptorenaNft__AlreadyMintedNft")
+                              resolve()
+                          } catch (e) {
+                              console.log(e)
+                              reject(e)
+                          }
+                      })
+                      const tx = await kryptorena.requestNft({ value: mintFee })
+                      const txReceipt = await tx.wait(1)
+                      await vrfCoordinatorV2Mock.fulfillRandomWords(
+                          txReceipt.events[1].args.requestId,
+                          kryptorena.address
+                      )
+                  })
               })
           })
           describe("fulfillRandomWords", function () {
@@ -184,5 +205,48 @@ const { tokenUris, subscriptionId } = require("/home/robitu/personal/MY_NFT/depl
               })
           })
 
-          describe("withdraw", function () {})
+          describe("withdraw", function () {
+              it("should withdraw entire contract balance", async () => {
+                  //   const accounts = await ethers.getSigners()
+                  // await kryptorena.connect(accounts[1]).requestNft({ value: mintFee })
+                  const startingDeployerBalance = await kryptorena.provider.getBalance(deployer)
+                  const startingContractBalance = await kryptorena.provider.getBalance(
+                      kryptorena.address
+                  )
+
+                  const mint = await kryptorena.requestNft({ value: mintFee })
+                  const mintReceipt = await mint.wait(1)
+                  const { gasUsed, effectiveGasPrice } = mintReceipt
+                  mintGasCost = gasUsed.mul(effectiveGasPrice)
+                  const transaction = await kryptorena.withdraw()
+                  const transactionReceipt = await transaction.wait(1)
+                  withdrawGasUsed = transactionReceipt.gasUsed
+                  withdrawEffectiveGasPrice = transactionReceipt.effectiveGasPrice
+                  const gasCost = withdrawGasUsed.mul(withdrawEffectiveGasPrice)
+
+                  const endingContractBalance = await kryptorena.provider.getBalance(
+                      kryptorena.address
+                  )
+                  const endingDeployerBalance = await kryptorena.provider.getBalance(deployer)
+
+                  assert.equal(endingContractBalance.toString(), 0)
+                  assert.equal(
+                      startingDeployerBalance
+                          .add(startingContractBalance)
+                          .sub(mintGasCost)
+                          .toString(),
+                      endingDeployerBalance.add(gasCost).toString()
+                  )
+              })
+
+              it("Should revert with error if transfer fails", async () => {
+                  const MockContract = await ethers.getContractFactory("MockContract")
+                  const mockContract = await MockContract.deploy(tokenUris)
+                  await mockContract.deployed()
+
+                  await expect(mockContract.targetWithdraw()).to.be.revertedWith(
+                      "Kryptorena__TransferFailed"
+                  )
+              })
+          })
       })
