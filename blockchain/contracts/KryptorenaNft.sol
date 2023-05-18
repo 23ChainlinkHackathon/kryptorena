@@ -55,7 +55,7 @@ contract KryptorenaNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
         uint32 callbackGasLimit,
         string[] memory NFTTokenUris,
         uint256 mintFee
-    ) VRFConsumerBaseV2(vrfCoordinatorV2) ERC721("MyNFT", "NFT") {
+    ) VRFConsumerBaseV2(vrfCoordinatorV2) ERC721("Kryptorena", "KTA") {
         i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
         i_subscriptionId = subscriptionId;
         i_gasLane = gasLane;

@@ -1,7 +1,7 @@
 const { assert, expect } = require("chai")
 const { network, deployments, ethers, getNamedAccounts } = require("hardhat")
 const { developmentChains, networkConfig } = require("../../helper-hardhat-config")
-const { tokenUris, subscriptionId } = require("/home/robitu/personal/MY_NFT/deploy/01-deploy-MyNft")
+const { tokenUris } = require("/home/robitu/personal/MY_NFT/deploy/01-deploy-MyNft")
 
 !developmentChains.includes(network.name)
     ? describe.skip
