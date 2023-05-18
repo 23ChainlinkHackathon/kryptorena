@@ -116,7 +116,7 @@ developmentChains.includes(network.name)
                   )
               })
           })
-          describe("withdraw", function () {
+          describe("fulfillRandomWord", function () {
               it("mints NFT after random number is returned", async function () {
                   await new Promise(async (resolve, reject) => {
                       kryptorena.once("NftMinted", async () => {
