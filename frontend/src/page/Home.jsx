@@ -1,27 +1,78 @@
-import React from 'react';
-// import backgroundImage from '../assets/bg1.png'
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+import { CustomButton, CustomInput, PageHOC } from '../components';
+import { useGlobalContext } from '../context';
+
 const Home = () => {
+  const { contract, walletAddress, gameData, setShowAlert, setErrorMessage } = useGlobalContext();
+  const [playerName, setPlayerName] = useState('');
+  const navigate = useNavigate();
 
-  const styles = {
-    background: 'linear-gradient(to bottom, #0072ff, #00c6ff)',
-    backgroundSize: 'cover',
-    height: '98vh',
-    padding:0,
-  }
+  const handleClick = async () => {
+    try {
+      const playerExists = await contract.isPlayer(walletAddress);
+
+      if (!playerExists) {
+        await contract.registerPlayer(playerName, playerName, { gasLimit: 500000 });
+
+        setShowAlert({
+          status: true,
+          type: 'info',
+          message: `${playerName} is being summoned!`,
+        });
+
+        setTimeout(() => navigate('/create-battle'), 8000);
+      }
+    } catch (error) {
+      setErrorMessage(error);
+    }
+  };
+
+  useEffect(() => {
+    const createPlayerToken = async () => {
+      const playerExists = await contract.isPlayer(walletAddress);
+      const playerTokenExists = await contract.isPlayerToken(walletAddress);
+
+      if (playerExists && playerTokenExists) navigate('/create-battle');
+    };
+
+    if (contract) createPlayerToken();
+  }, [contract]);
+
+  useEffect(() => {
+    if (gameData.activeBattle) {
+      navigate(`/battle/${gameData.activeBattle.name}`);
+    }
+  }, [gameData]);
+
   return (
-    <div style={styles}>
-      <h1 className="text-5xl p-3">KRYPTORENA</h1>
-      <h2 className="text-3xl p-3">YOU, LUCK, & REWARDS</h2>
-      <p className="text-xl p-3">Made with 💜 by BALENDU, ROBERTO, ERIC, ROSE</p>
+    walletAddress && (
+      <div className="flex flex-col">
+        <CustomInput
+          label="Name"
+          placeHolder="Enter your name"
+          value={playerName}
+          handleValueChange={setPlayerName}
+        />
 
-
-     
-        {/* <img src={backgroundImage} alt="hero-img" className="w-full xl:h-full object-cover" /> */}
-     
-    </div>
-
-     
-  )
+        <CustomButton
+          title="Register"
+          handleClick={handleClick}
+          restStyles="mt-6"
+        />
+      </div>
+    )
+  );
 };
 
-export default Home;
+export default PageHOC(
+  Home,
+  <>
+    Welcome to KRYPTORENA <br /> 
+  </>,
+  <>
+    Connect your wallet to start playing <br /> 
+  </>,
+);
+

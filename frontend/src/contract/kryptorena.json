@@ -1,4 +1,11 @@
 {
-    "contractName": "kryptorena",
-    "abi": "put abi data here in square brackets"
+  "_format": "hh-sol-artifact-1",
+  "contractName": "kryptorena",
+  "sourceName": "contracts/kryptorena.sol",
+  "abi": [
+    
+  ],
+  "bytecode": "",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
 }

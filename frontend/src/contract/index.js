@@ -1,5 +1,4 @@
 import contract from './kryptorena.json';
 
-
-export const address = "0xaddresshere";
-export const {abi:ABI} = contract;
+export const ADDRESS = '0x00';
+export const { abi: ABI } = contract;
