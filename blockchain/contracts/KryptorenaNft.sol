@@ -65,8 +65,6 @@ contract KryptorenaNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
         i_mintFee = mintFee;
     }
 
-    receive() external payable {}
-
     /**
      * @notice Requests a random number to use for creating a new NFT.
      * @dev Sends a VRF request to the coordinator contract and associates the request ID with the sender's address. Emits an event as well.

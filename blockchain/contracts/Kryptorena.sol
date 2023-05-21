@@ -4,6 +4,7 @@ pragma solidity ^0.8.16;
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
+import "./KryptorenaNft.sol";
 
 contract kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
     enum GameStatus {
@@ -15,13 +16,13 @@ contract kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
     struct BattleId {
         uint id;
         string name; //user defined
+        uint playerHealth; // lets keep it 10 in the beginning of each battle, will be changed after each attack or defence based on who won the round
         uint attackPoints; // randomly by Chainlink vrfv2
         uint defencePoints; // randomly by Chainlink vrfv2
     }
     struct Player {
         string playerName; // user defined
         address playerAddress; // metamask address
-        uint playerHealth; // lets keep it 10 in the beginning of each battle, will be changed after each attack or defence based on who won the round
         bool inGame; // true if playing if by any chance player left the game, we need to put it false
     }
 
@@ -44,12 +45,20 @@ contract kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
         uint defence;
     }
 
+    KryptorenaNft public i_kryptorenaNft;
+    uint256 public i_mintFee;
+    uint256 s_randomAttackValue;
+    uint256 s_randomDefenseValue;
+    uint256 public constant PLAYER_HP = 10;
+
     Player[] public players; // store all players
     BattleId[] public battleId; // store all game ids
     Game[] public games; // store all games
 
     mapping(address => uint) public playerInfo;
     mapping(string => uint) public gameInfo;
+    mapping(uint256 => address) public s_requestIdToSender;
+    mapping(address => string) public s_addressToUsername;
 
     //Chainlink VRF Variables
     VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
@@ -70,23 +79,39 @@ contract kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
         uint64 subscriptionId,
         bytes32 gasLane,
         uint32 callbackGasLimit,
-        string[] memory cardTokenUris
+        string[] memory cardTokenUris,
+        address kryptorenaNft,
+        uint256 mintFee
     ) VRFConsumerBaseV2(vrfCoordinatorV2) ConfirmedOwner(msg.sender) {
         i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
         i_subscriptionId = subscriptionId;
         i_gasLane = gasLane;
         i_callbackGasLimit = callbackGasLimit;
+        i_kryptorenaNft = KryptorenaNft(kryptorenaNft);
+        i_mintFee = mintFee;
     }
 
     // register the player
 
-    function registerNewPlayer(string memory _name) external {
+    function registerNewPlayer(string memory _name) external returns (uint256 requestId) {
         require(!isPlayer(msg.sender), "This address already registered");
+        require(msg.value >= i_mintFee, "Not enough AVAX");
+
+        i_kryptorenaNft.requestNft{value: msg.value}();
 
         uint _id = players.length;
-        players.push(Player(_name, msg.sender, 10, false));
-
+        players.push(Player(_name, msg.sender, false));
         playerInfo[msg.sender] = _id;
+
+        requestId = i_vrfCoordinator.requestRandomWords(
+            i_gasLane,
+            i_subscriptionId,
+            REQUEST_CONFIRMATIONS,
+            i_callbackGasLimit,
+            NUM_WORDS
+        );
+        s_requestIdToSender[requestId] = msg.sender;
+        s_addressToUsername[msg.sender] = _name;
 
         emit newPlayer(msg.sender, _name);
     }
@@ -169,10 +194,21 @@ contract kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
             : endGame(_game.players[0], _game);
     }
 
-    function fulfillRandomWords(
-        uint256 requestId,
-        uint256[] memory randomWords
-    ) internal override {}
+    function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override {
+        uint256 randomNumber = randomWords[0];
+        s_randomAttackValue = randomNumber % 10;
+        s_randomDefenseValue = 10 - s_randomAttackValue;
+        address user = s_requestIdToSender[requestId];
+        battleId.push(
+            BattleId(
+                playerInfo[user],
+                s_addressToUsername[user],
+                PLAYER_HP,
+                s_randomAttackValue,
+                s_randomDefenseValue
+            )
+        );
+    }
 
     function endGame(address lastUser, Game memory _game) internal returns (Game memory) {
         require(_game.GameStatus != GameStatus.ENDED, "The game has ended");
