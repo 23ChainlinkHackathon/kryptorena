@@ -6,7 +6,7 @@ import "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "./KryptorenaNft.sol";
 
-contract kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
+contract Kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
     enum GameStatus {
         STARTED,
         ENDED,
