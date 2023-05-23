@@ -20,24 +20,42 @@ contract KryptorenaBattle is VRFConsumerBaseV2, ConfirmedOwner {
         ATTACK,
         DEFEND
     }
+    enum Result {
+        UNDEFINED,
+        WON,
+        LOST,
+        DRAW
+    }
 
     struct Battle {
         address player1;
         address player2;
+        uint256 player1HP;
         uint256 player1AttackPoints;
         uint256 player1DefensePoints;
+        uint256 player2HP;
         uint256 player2AttackPoints;
         uint256 player2DefensePoints;
         AttackOrDefense player1Choice;
         AttackOrDefense player2Choice;
+        Result player1Result;
+        Result player2Result;
         uint256 turn;
     }
+    /**
+     * @notice 'battles' mapping associates the battleId with Battle struct to store information about the battle
+     * @notice 'currentMatch'is used to keep track of the ongoing battle for each player participating in the game
+     * @notice 's_requestIdToSender' works with Chainlink VRF to keep track of message sender
+     */
 
     mapping(uint256 => Battle) public battles;
     mapping(address => Battle) public currentMatch;
-    uint256 public battleCount;
+    mapping(uint256 => address) public s_requestIdToSender;
 
-    event BattleResult(uint256 battleId, address winner);
+    uint256 public battleId;
+
+    event BattleResult(uint256 indexed requestId, address winner);
+    event BattleCreated(uint256 indexed battleId, address player1, address player2);
 
     constructor(
         address vrfCoordinatorV2,
@@ -49,15 +67,14 @@ contract KryptorenaBattle is VRFConsumerBaseV2, ConfirmedOwner {
         i_subscriptionId = subscriptionId;
         i_gasLane = gasLane;
         i_callbackGasLimit = callbackGasLimit;
-        battleCount = 0;
+        battleId = 0;
     }
 
-    function fulfillRandomWords(
-        uint256 requestId,
-        uint256[] memory randomWords
-    ) internal override {}
-
-    // Randomize who begins the battle
+    /**
+     * @notice arguements come from game logic contract
+     * @notice maps battleId to Battle Struct for this specific match between specific players
+     * @notice currentMatch[address] links each player to this specific battle struct with ID for future reference
+     */
     function initiateBattle(
         address player1,
         address player2,
@@ -69,27 +86,39 @@ contract KryptorenaBattle is VRFConsumerBaseV2, ConfirmedOwner {
         require(player1 != address(0), "Invalid player.");
         require(player2 != address(0), "Invalid player.");
 
-        battleCount++;
-        battles[battleCount] = Battle(
+        battleId++;
+        battles[battleId] = Battle(
             player1,
             player2,
+            10,
             player1AttackPoints,
             player1DefensePoints,
+            10,
             player2AttackPoints,
             player2DefensePoints,
             AttackOrDefense.GAME_START,
             AttackOrDefense.GAME_START,
+            Result.UNDEFINED,
+            Result.UNDEFINED,
             0
         );
-        currentMatch[player1] = battles[battleCount];
-        currentMatch[player2] = battles[battleCount];
+        currentMatch[player1] = battles[battleId];
+        currentMatch[player2] = battles[battleId];
 
-        emit BattleResult(battleCount, address(0));
+        emit BattleCreated(battleId, player1, player2);
     }
 
+    // TO DO:
     // Require that for each attack and defend options that it is the player's respective turn and that the timer has not gone off
     // and that the battle is still active and that there does exist a battle between both addresses.
     // and that users HP is not zero
+    // and that each user only takes one action per turn
+
+    //How to prevent users for taking two turns in one?
+
+    /**
+     * @notice 'round' references the current players ongoing match
+     */
     function attack() external {
         Battle storage round = currentMatch[msg.sender];
         if (msg.sender == round.player1) {
@@ -116,5 +145,71 @@ contract KryptorenaBattle is VRFConsumerBaseV2, ConfirmedOwner {
         }
     }
 
-    function turnAction(address player) private {}
+    function turnAction(address player) private {
+        Battle storage round = currentMatch[player];
+        if (
+            round.player1Choice == AttackOrDefense.ATTACK &&
+            round.player2Choice == AttackOrDefense.ATTACK
+        ) {}
+        if (
+            round.player1Choice == AttackOrDefense.ATTACK &&
+            round.player2Choice == AttackOrDefense.DEFEND
+        ) {}
+        if (
+            round.player1Choice == AttackOrDefense.DEFEND &&
+            round.player2Choice == AttackOrDefense.ATTACK
+        ) {}
+        if (
+            round.player1Choice == AttackOrDefense.DEFEND &&
+            round.player2Choice == AttackOrDefense.DEFEND
+        ) {}
+        if (round.player1HP == 0 || round.player2HP == 0 /**|| timer ENDS */) {
+            endGame(player);
+        }
+    }
+
+    /**
+     * @notice This function triggers after both players have chosen their move
+     * @param player address of any player in order to reference the match that is ongoing
+     */
+
+    function endGame(address player) private returns (uint256 requestId) {
+        Battle storage round = currentMatch[player];
+        if (round.player1HP > round.player2HP) {
+            round.player1Result = Result.WON;
+            round.player2Result = Result.LOST;
+        } else if (round.player1HP == round.player2HP) {
+            round.player1Result = round.player2Result = Result.DRAW;
+        } else {
+            round.player1Result = Result.LOST;
+            round.player2Result = Result.WON;
+        }
+        requestId = i_vrfCoordinator.requestRandomWords(
+            i_gasLane,
+            i_subscriptionId,
+            REQUEST_CONFIRMATIONS,
+            i_callbackGasLimit,
+            NUM_WORDS
+        );
+        address winner;
+        if (round.player1Result == Result.WON) {
+            winner = round.player1;
+        } else if (round.player2Result == Result.WON) {
+            winner = round.player2;
+        } else {
+            winner = address(0);
+        }
+        s_requestIdToSender[requestId] = player;
+        emit BattleResult(requestId, winner);
+    }
+
+    /**
+     * @notice randomizes the new stats for winner depending on difference of HP
+     */
+
+    function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override {
+        uint256 randomNumber = randomWords[0];
+        address player = s_requestIdToSender[requestId];
+        Battle storage round = currentMatch[player];
+    }
 }
