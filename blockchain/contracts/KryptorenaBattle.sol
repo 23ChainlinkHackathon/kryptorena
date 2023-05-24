@@ -2,10 +2,14 @@
 pragma solidity ^0.8.16;
 
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
-import "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "./Kryptorena.sol";
 
-contract KryptorenaBattle is VRFConsumerBaseV2, ConfirmedOwner {
+contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
+    //contract
+    Kryptorena public i_kryptorena;
+
     //VRF variables
     VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
     uint64 private immutable i_subscriptionId;
@@ -28,12 +32,13 @@ contract KryptorenaBattle is VRFConsumerBaseV2, ConfirmedOwner {
     }
 
     struct Battle {
+        uint256 battleId;
         address player1;
         address player2;
-        uint256 player1HP;
+        int256 player1HP;
         uint256 player1AttackPoints;
         uint256 player1DefensePoints;
-        uint256 player2HP;
+        int256 player2HP;
         uint256 player2AttackPoints;
         uint256 player2DefensePoints;
         AttackOrDefense player1Choice;
@@ -53,8 +58,11 @@ contract KryptorenaBattle is VRFConsumerBaseV2, ConfirmedOwner {
     mapping(uint256 => address) public s_requestIdToSender;
 
     uint256 public battleId;
+    bool public initialized;
 
-    event BattleResult(uint256 indexed requestId, address winner);
+    event BattleResult(uint256 indexed battleId, address winner);
+    event RngRequested(uint256 indexed requestId, address winner);
+
     event BattleCreated(uint256 indexed battleId, address player1, address player2);
 
     constructor(
@@ -62,12 +70,19 @@ contract KryptorenaBattle is VRFConsumerBaseV2, ConfirmedOwner {
         uint64 subscriptionId,
         bytes32 gasLane,
         uint32 callbackGasLimit
-    ) VRFConsumerBaseV2(vrfCoordinatorV2) ConfirmedOwner(msg.sender) {
+    ) VRFConsumerBaseV2(vrfCoordinatorV2) Ownable() {
         i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
         i_subscriptionId = subscriptionId;
         i_gasLane = gasLane;
         i_callbackGasLimit = callbackGasLimit;
         battleId = 0;
+        initialized = false;
+    }
+
+    function initiateContract(address kryptorena) public onlyOwner {
+        require(!initialized, "Already initialized");
+        i_kryptorena = Kryptorena(kryptorena);
+        initialized = true;
     }
 
     /**
@@ -88,6 +103,7 @@ contract KryptorenaBattle is VRFConsumerBaseV2, ConfirmedOwner {
 
         battleId++;
         battles[battleId] = Battle(
+            battleId,
             player1,
             player2,
             10,
@@ -173,7 +189,7 @@ contract KryptorenaBattle is VRFConsumerBaseV2, ConfirmedOwner {
      * @param player address of any player in order to reference the match that is ongoing
      */
 
-    function endGame(address player) private returns (uint256 requestId) {
+    function endGame(address player) private {
         Battle storage round = currentMatch[player];
         if (round.player1HP > round.player2HP) {
             round.player1Result = Result.WON;
@@ -184,6 +200,21 @@ contract KryptorenaBattle is VRFConsumerBaseV2, ConfirmedOwner {
             round.player1Result = Result.LOST;
             round.player2Result = Result.WON;
         }
+        address winner;
+        if (round.player1Result == Result.WON) {
+            winner = round.player1;
+            requestRandomWord(winner);
+        } else if (round.player2Result == Result.WON) {
+            winner = round.player2;
+            requestRandomWord(winner);
+        } else {
+            winner = address(0);
+            i_kryptorena.updateStats(address(0), 0, 0);
+        }
+        emit BattleResult(round.battleId, winner);
+    }
+
+    function requestRandomWord(address winner) private returns (uint256 requestId) {
         requestId = i_vrfCoordinator.requestRandomWords(
             i_gasLane,
             i_subscriptionId,
@@ -191,16 +222,7 @@ contract KryptorenaBattle is VRFConsumerBaseV2, ConfirmedOwner {
             i_callbackGasLimit,
             NUM_WORDS
         );
-        address winner;
-        if (round.player1Result == Result.WON) {
-            winner = round.player1;
-        } else if (round.player2Result == Result.WON) {
-            winner = round.player2;
-        } else {
-            winner = address(0);
-        }
-        s_requestIdToSender[requestId] = player;
-        emit BattleResult(requestId, winner);
+        s_requestIdToSender[requestId] = winner;
     }
 
     /**
@@ -209,7 +231,29 @@ contract KryptorenaBattle is VRFConsumerBaseV2, ConfirmedOwner {
 
     function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override {
         uint256 randomNumber = randomWords[0];
-        address player = s_requestIdToSender[requestId];
-        Battle storage round = currentMatch[player];
+        address winner = s_requestIdToSender[requestId];
+        Battle storage round = currentMatch[winner];
+        uint256 s_HP_DIFFERENCE = uint256(absoluteValue(round.player1HP, round.player2HP));
+        uint256 rngAttackValue = randomNumber % s_HP_DIFFERENCE;
+        uint256 rngDefenseValue = s_HP_DIFFERENCE - rngAttackValue;
+
+        if (winner == round.player1) {
+            round.player1AttackPoints += rngAttackValue;
+            round.player1DefensePoints += rngDefenseValue;
+            i_kryptorena.updateStats(winner, round.player1AttackPoints, round.player1DefensePoints);
+        } else {
+            round.player2AttackPoints += rngAttackValue;
+            round.player2DefensePoints += rngDefenseValue;
+            i_kryptorena.updateStats(winner, round.player2AttackPoints, round.player2DefensePoints);
+        }
+    }
+
+    function absoluteValue(int256 player1HP, int256 player2HP) public returns (int256) {
+        int256 num = player1HP - player2HP;
+        if (num >= 0) {
+            return num;
+        } else {
+            return -num;
+        }
     }
 }
