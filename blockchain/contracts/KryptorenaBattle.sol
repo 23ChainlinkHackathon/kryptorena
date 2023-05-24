@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.16;
+pragma solidity ^0.8.8;
 
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+
 import "./Kryptorena.sol";
 
 contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
@@ -24,7 +25,7 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         ATTACK,
         DEFEND
     }
-    enum Result {
+    enum endStatus {
         UNDEFINED,
         WON,
         LOST,
@@ -43,10 +44,14 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         uint256 player2DefensePoints;
         AttackOrDefense player1Choice;
         AttackOrDefense player2Choice;
-        Result player1Result;
-        Result player2Result;
-        uint256 turn;
+        // uint256 turn;
     }
+
+    struct Result {
+        endStatus player1;
+        endStatus player2;
+    }
+
     /**
      * @notice 'battles' mapping associates the battleId with Battle struct to store information about the battle
      * @notice 'currentMatch'is used to keep track of the ongoing battle for each player participating in the game
@@ -55,6 +60,9 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
 
     mapping(uint256 => Battle) public battles;
     mapping(address => Battle) public currentMatch;
+    mapping(uint256 => Result) public matchOutcome;
+    mapping(address => Result) public matchOutcomePlayerTracker;
+
     mapping(uint256 => address) public s_requestIdToSender;
 
     uint256 public battleId;
@@ -113,13 +121,16 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
             player2AttackPoints,
             player2DefensePoints,
             AttackOrDefense.GAME_START,
-            AttackOrDefense.GAME_START,
-            Result.UNDEFINED,
-            Result.UNDEFINED,
-            0
+            AttackOrDefense.GAME_START
+            // 0
         );
+        matchOutcome[battleId] = Result(endStatus.UNDEFINED, endStatus.UNDEFINED);
+
         currentMatch[player1] = battles[battleId];
         currentMatch[player2] = battles[battleId];
+
+        matchOutcomePlayerTracker[player1] = matchOutcome[battleId];
+        matchOutcomePlayerTracker[player2] = matchOutcome[battleId];
 
         emit BattleCreated(battleId, player1, player2);
     }
@@ -142,10 +153,10 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         } else {
             round.player2Choice = AttackOrDefense.ATTACK;
         }
-        round.turn += 1;
-        if (round.turn % 2 == 0) {
-            turnAction(msg.sender);
-        }
+        // round.turn += 1;
+        // if (round.turn % 2 == 0) {
+        //     turnAction(msg.sender);
+        // }
     }
 
     function defend() external {
@@ -155,10 +166,10 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         } else {
             round.player2Choice = AttackOrDefense.DEFEND;
         }
-        round.turn += 1;
-        if (round.turn % 2 == 0) {
-            turnAction(msg.sender);
-        }
+        // round.turn += 1;
+        // if (round.turn % 2 == 0) {
+        //     turnAction(msg.sender);
+        // }
     }
 
     function turnAction(address player) private {
@@ -191,20 +202,21 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
 
     function endGame(address player) private {
         Battle storage round = currentMatch[player];
+        Result storage resultData = matchOutcomePlayerTracker[player];
         if (round.player1HP > round.player2HP) {
-            round.player1Result = Result.WON;
-            round.player2Result = Result.LOST;
+            resultData.player1 = endStatus.WON;
+            resultData.player2 = endStatus.LOST;
         } else if (round.player1HP == round.player2HP) {
-            round.player1Result = round.player2Result = Result.DRAW;
+            resultData.player2 = resultData.player1 = endStatus.DRAW;
         } else {
-            round.player1Result = Result.LOST;
-            round.player2Result = Result.WON;
+            resultData.player1 = endStatus.LOST;
+            resultData.player2 = endStatus.WON;
         }
         address winner;
-        if (round.player1Result == Result.WON) {
+        if (resultData.player1 == endStatus.WON) {
             winner = round.player1;
             requestRandomWord(winner);
-        } else if (round.player2Result == Result.WON) {
+        } else if (resultData.player2 == endStatus.WON) {
             winner = round.player2;
             requestRandomWord(winner);
         } else {
@@ -231,6 +243,7 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
 
     function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override {
         uint256 randomNumber = randomWords[0];
+
         address winner = s_requestIdToSender[requestId];
         Battle storage round = currentMatch[winner];
         uint256 s_HP_DIFFERENCE = uint256(absoluteValue(round.player1HP, round.player2HP));
@@ -248,7 +261,7 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         }
     }
 
-    function absoluteValue(int256 player1HP, int256 player2HP) public returns (int256) {
+    function absoluteValue(int256 player1HP, int256 player2HP) public pure returns (int256) {
         int256 num = player1HP - player2HP;
         if (num >= 0) {
             return num;

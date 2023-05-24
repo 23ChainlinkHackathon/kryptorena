@@ -6530,6 +6530,10 @@ klaw@^1.0.0:
   optionalDependencies:
     graceful-fs "^4.1.9"
 
+"kryptorena@https://github.com/23ChainlinkHackathon/kryptorena":
+  version "0.0.0"
+  resolved "https://github.com/23ChainlinkHackathon/kryptorena#931aae6d74cb6835316bff1ef4e0c9404c7975ec"
+
 lcid@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/lcid/-/lcid-1.0.0.tgz#308accafa0bc483a3867b4b6f2b9506251d1b835"
