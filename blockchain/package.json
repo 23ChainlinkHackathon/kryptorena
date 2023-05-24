@@ -25,6 +25,7 @@
         "fetch-blob": "^3.2.0",
         "fs": "^0.0.1-security",
         "hardhat-contract-sizer": "^2.8.0",
+        "kryptorena": "https://github.com/23ChainlinkHackathon/kryptorena",
         "mime": "^3.0.0",
         "nft.storage": "^7.0.3",
         "path": "^0.12.7",
