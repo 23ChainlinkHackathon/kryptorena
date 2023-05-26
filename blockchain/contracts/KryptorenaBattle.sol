@@ -4,8 +4,20 @@ pragma solidity ^0.8.8;
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-
 import "./Kryptorena.sol";
+
+/**
+ * @notice This is the battle contract. This contract works in tangent with the game logic contract.
+ * Whenever a user starts a battle from the lobby or joins a game it will trigger this contract to 
+ * initiate the battle with the user's stats. Initially, this contract will have to be linked with 
+ * the Kryptorena game logic contract through the initialize() function. Once two players have 
+ * initiated the match, their entire battle will be recorded, including what moves each user took, 
+ * the effects of their choices, and in which respective turns. After a winner has been decided, 
+ * the Chainlink VRF contract will be used to randomize the HP difference between the winner and 
+ * loser and randomly designate this number between a new attack and defense value. These new 
+ * attack and defense values will then be sent to the game-logic contract (through endGame()) for 
+ * player stat update.
+ */
 
 contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
     //contract
@@ -21,7 +33,7 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
 
     //Battle Variables
     enum AttackOrDefense {
-        UNDEFINED,
+        PENDING,
         ATTACK,
         DEFEND
     }
@@ -49,8 +61,6 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
     struct BattleData {
         endStatus player1;
         endStatus player2;
-        bool player1ChoiceMade;
-        bool player2ChoiceMade;
         uint256 turn;
         // uint256 matchDuration;
         // uint256 lastTurnTimestamp;
@@ -60,6 +70,7 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
     /**
      * @notice 'battles' mapping associates the battleId with Battle struct to store information about the battle
      * @notice 'currentMatch'is used to keep track of the ongoing battle for each player participating in the game
+     * @notice matchData and matchDataPlayerTracker tracks external battle data such as turn, timers and end results.
      * @notice 's_requestIdToSender' works with Chainlink VRF to keep track of message sender
      */
 
@@ -67,16 +78,14 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
     mapping(address => Battle) public currentMatch;
     mapping(uint256 => BattleData) public matchData;
     mapping(address => BattleData) public matchDataPlayerTracker;
-
     mapping(uint256 => address) public s_requestIdToSender;
 
-    uint256 public battleId;
     bool public initialized;
+    uint256 public battleId;
     uint256 public constant MAX_TURNS = 5;
 
     event BattleResult(uint256 indexed battleId, address winner);
     event RngRequested(uint256 indexed requestId, address winner);
-
     event BattleCreated(uint256 indexed battleId, address player1, address player2);
 
     constructor(
@@ -93,6 +102,10 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         initialized = false;
     }
 
+    /**
+     * @dev When battle contract is deployed, we link it to the game logic contract through this function
+     */
+
     function initiateContract(address kryptorena) public onlyOwner {
         require(!initialized, "Already initialized");
         i_kryptorena = Kryptorena(kryptorena);
@@ -100,9 +113,9 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
     }
 
     /**
-     * @notice arguements come from game logic contract
-     * @notice maps battleId to Battle Struct for this specific match between specific players
-     * @notice currentMatch[address] links each player to this specific battle struct with ID for future reference
+     * @dev arguements come from game logic contract
+     * @dev mapping of battleId to Battle Struct is used to track the match between specific addresses (players)
+     * @dev currentMatch[address] is used with battleId and Battle struct to call match details with player's address.
      */
     function initiateBattle(
         address player1,
@@ -128,15 +141,13 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
             10,
             player2AttackPoints,
             player2DefensePoints,
-            AttackOrDefense.UNDEFINED,
-            AttackOrDefense.UNDEFINED
+            AttackOrDefense.PENDING,
+            AttackOrDefense.PENDING
             // 0
         );
         matchData[battleId] = BattleData(
             endStatus.UNDEFINED,
             endStatus.UNDEFINED,
-            false,
-            false,
             0
             // 60,
             // block.timestamp,
@@ -152,34 +163,42 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         emit BattleCreated(battleId, player1, player2);
     }
 
-    // TO DO:
-    // and that the battle is still active and that there does exist a battle between both addresses.
-    // and that users HP is not zero
-    // and that each user only takes one action per turn
-
-    //How to prevent users for taking two turns in one?
-
     /**
      * @notice 'round' references the current players ongoing match
+     * It also tracks the choice of the player for the current turn.
+     * It successfully calls on turnAction if both players have made a choice.
      */
     function attack() external {
         Battle storage round = currentMatch[msg.sender];
         BattleData storage resultData = matchDataPlayerTracker[msg.sender];
 
-        // require(
-        //     block.timestamp <= resultData.lastTurnTimestamp + resultData.turnDuration,
-        //     "Turn time limit exceeded"
-        // );
         require(resultData.turn <= MAX_TURNS, "There are no more turns to this match!");
         require(
             msg.sender == round.player1 || msg.sender == round.player2,
             "Player is not in this battle"
         );
+        if (msg.sender == round.player1) {
+            require(round.player1Choice == AttackOrDefense.PENDING, "You've already taken a turn");
+        } else if (msg.sender == round.player2) {
+            require(round.player2Choice == AttackOrDefense.PENDING, "You've already taken a turn");
+        }
+
+        // require(
+        //     block.timestamp <= resultData.lastTurnTimestamp + resultData.turnDuration,
+        //     "Turn time limit exceeded"
+        // );
 
         if (msg.sender == round.player1) {
             round.player1Choice = AttackOrDefense.ATTACK;
         } else {
             round.player2Choice = AttackOrDefense.ATTACK;
+        }
+
+        if (
+            round.player1Choice != AttackOrDefense.PENDING &&
+            round.player2Choice != AttackOrDefense.PENDING
+        ) {
+            turnAction(msg.sender);
         }
     }
 
@@ -187,22 +206,44 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         Battle storage round = currentMatch[msg.sender];
         BattleData storage resultData = matchDataPlayerTracker[msg.sender];
 
-        // require(
-        //     block.timestamp <= resultData.lastTurnTimestamp + resultData.turnDuration,
-        //     "Match time limit exceeded"
-        // );
         require(resultData.turn <= MAX_TURNS, "There are no more turns to this match!");
         require(
             msg.sender == round.player1 || msg.sender == round.player2,
             "Player is not in this battle"
         );
+        if (msg.sender == round.player1) {
+            require(round.player1Choice == AttackOrDefense.PENDING, "You've already taken a turn");
+        } else if (msg.sender == round.player2) {
+            require(round.player2Choice == AttackOrDefense.PENDING, "You've already taken a turn");
+        }
+
+        // require(
+        //     block.timestamp <= resultData.lastTurnTimestamp + resultData.turnDuration,
+        //     "Match time limit exceeded"
+        // );
 
         if (msg.sender == round.player1) {
             round.player1Choice = AttackOrDefense.DEFEND;
         } else {
             round.player2Choice = AttackOrDefense.DEFEND;
         }
+
+        if (
+            round.player1Choice != AttackOrDefense.PENDING &&
+            round.player2Choice != AttackOrDefense.PENDING
+        ) {
+            turnAction(msg.sender);
+        }
     }
+
+    /**
+     * @dev Executes battle logic depending on user's choice. Function only triggers when both players have taken a turn.
+     * @param player address of any player in order to reference the match that is ongoing
+     * Optional: If game is being held hostage chainlink automation can trigger this function. Status: PENDING
+     * If any user's HP is zero or the amount of turns is equal to MAX_TURNS, it will trigger the endGame() function.
+     * Adds to round turn.
+     * Returns string message with players decision for better readability in front end.
+     */
 
     function turnAction(address player) private returns (string memory) {
         BattleData storage resultData = matchDataPlayerTracker[msg.sender];
@@ -242,29 +283,27 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
             message = "Both players defended! No damage done.";
         } else if (
             round.player1Choice == AttackOrDefense.ATTACK &&
-            round.player2Choice == AttackOrDefense.UNDEFINED
+            round.player2Choice == AttackOrDefense.PENDING
         ) {
             round.player2HP = round.player2HP - int(round.player1AttackPoints);
             message = "Player 1 attacked, Player 2 chose nothing!";
         } else if (
             round.player1Choice == AttackOrDefense.DEFEND &&
-            round.player2Choice == AttackOrDefense.UNDEFINED
+            round.player2Choice == AttackOrDefense.PENDING
         ) {
             message = "Player 1 defended, Player 2 chose nothing!";
         } else if (
-            round.player1Choice == AttackOrDefense.UNDEFINED &&
+            round.player1Choice == AttackOrDefense.PENDING &&
             round.player2Choice == AttackOrDefense.ATTACK
         ) {
             round.player1HP = round.player1HP - int(round.player2AttackPoints);
             message = "Player 2 attacked, Player 1 chose nothing!";
         } else if (
-            round.player1Choice == AttackOrDefense.UNDEFINED &&
+            round.player1Choice == AttackOrDefense.PENDING &&
             round.player2Choice == AttackOrDefense.DEFEND
         ) {
             message = "Player 2 defended, Player 1 chose nothing!";
         }
-
-        resultData.turn += 1;
 
         if (round.player1HP < 0) {
             round.player1HP = 0;
@@ -277,11 +316,19 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
             endGame(player);
         }
 
+        resultData.turn += 1;
+
+        round.player1Choice = AttackOrDefense.PENDING;
+        round.player2Choice = AttackOrDefense.PENDING;
+
         return message;
     }
 
     /**
-     * @notice This function triggers after both players have chosen their move
+     * @notice This function triggers after end game conditions have been met.
+     * End game conditions: A player has zero HP or the max amount of turns has been reached.
+     * It will assign the status of winner or loser accordingly and request for VRF function
+     * Emits an event.
      * @param player address of any player in order to reference the match that is ongoing
      */
 
@@ -312,6 +359,11 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         emit BattleResult(round.battleId, winner);
     }
 
+    /**
+     * @notice Creates a requestId for chainlink VRF that will trigger fulfillrandomWord function
+     * Emits event.
+     */
+
     function requestRandomWord(address winner) private returns (uint256 requestId) {
         requestId = i_vrfCoordinator.requestRandomWords(
             i_gasLane,
@@ -321,10 +373,13 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
             NUM_WORDS
         );
         s_requestIdToSender[requestId] = winner;
+        emit RngRequested(requestId, winner);
     }
 
     /**
      * @notice randomizes the new stats for winner depending on difference of HP
+     * Calls absoluteValue function to guarantee the difference of HP is a positive value.
+     * Returns new attack and defense values to game logic contract.
      */
 
     function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override {
@@ -346,6 +401,10 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
             i_kryptorena.updateStats(winner, round.player2AttackPoints, round.player2DefensePoints);
         }
     }
+
+    /**
+     * @notice Used to return positive number between two int256 values
+     */
 
     function absoluteValue(int256 player1HP, int256 player2HP) public pure returns (int256) {
         int256 num = player1HP - player2HP;

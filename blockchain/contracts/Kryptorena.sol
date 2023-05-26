@@ -81,17 +81,16 @@ contract Kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
         uint64 subscriptionId,
         bytes32 gasLane,
         uint32 callbackGasLimit,
-        //   string[] memory cardTokenUris,
-        //  address kryptorenaNftAddress,
-        //  uint256 mintFee,
+        address kryptorenaNftAddress,
+        uint256 mintFee,
         address kryptorenaBattleAddress
     ) VRFConsumerBaseV2(vrfCoordinatorV2) ConfirmedOwner(msg.sender) {
         i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
         i_subscriptionId = subscriptionId;
         i_gasLane = gasLane;
         i_callbackGasLimit = callbackGasLimit;
-        //i_kryptorenaNft = KryptorenaNft(kryptorenaNftAddress);
-        // i_mintFee = mintFee;
+        i_kryptorenaNft = KryptorenaNft(kryptorenaNftAddress);
+        i_mintFee = mintFee;
         i_kryptorenaBattle = KryptorenaBattle(kryptorenaBattleAddress);
     }
 
@@ -123,40 +122,8 @@ contract Kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
     /**
      *
      * @dev This will trigger battle contract. Built it like this for now just for testing purposes.
+     * @dev Need to make a require that battle can only be initiated by users who are not in ACTIVE battles.
      */
-
-    struct forTesting {
-        address player1;
-        address player2;
-        uint256 player1AttackPoints;
-        uint256 player1DefensePoints;
-        uint256 player2AttackPoints;
-        uint256 player2DefensePoints;
-    }
-    forTesting test =
-        forTesting(
-            0xC9C4C378eB60de311B004783E47d683A74eE3756,
-            0x22fb1C7a7FAc8aD61b14c61d776C010C439aA078,
-            1,
-            10,
-            1,
-            10
-        );
-
-    function fakeJoinGameExtraStep() public {
-        initiateFromContract();
-    }
-
-    function initiateFromContract() public {
-        initiateBattle(
-            test.player1,
-            test.player2,
-            test.player1AttackPoints,
-            test.player1DefensePoints,
-            test.player2AttackPoints,
-            test.player2DefensePoints
-        );
-    }
 
     function initiateBattle(
         address player1,
@@ -176,10 +143,10 @@ contract Kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
         );
     }
 
-    //     /**
-    //      * @notice Battle contract will call this function to send winner's updated stats
-    //      * @notice This function will then update the player struct with the new stats.
-    //      */
+    /**
+     * @dev Battle contract will call this function to send winner's updated stats
+     * @notice This function will then update the player struct with the new stats.
+     */
 
     function updateStats(address winner, uint256 newAttack, uint256 newDefense) external {
         require(msg.sender == address(i_kryptorenaBattle), "Unauthorized");
@@ -264,10 +231,16 @@ contract Kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
     //     //         : endGame(_game.players[0], _game);
     //     // }
 
+    /**
+     * @dev This will initialize the random values of the Attack and Defense when users register for the first time.
+     */
+
     function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override {
+        //require that player is not already registered
+        uint256 VALUE_RANGE = 10;
         uint256 randomNumber = randomWords[0];
-        s_randomAttackValue = randomNumber % 10;
-        s_randomDefenseValue = 10 - s_randomAttackValue;
+        s_randomAttackValue = randomNumber % VALUE_RANGE;
+        s_randomDefenseValue = VALUE_RANGE - s_randomAttackValue;
         address user = s_requestIdToSender[requestId];
         battleId.push(
             BattleId(
