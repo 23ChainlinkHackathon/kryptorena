@@ -81,44 +81,100 @@ contract Kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
         uint64 subscriptionId,
         bytes32 gasLane,
         uint32 callbackGasLimit,
-        string[] memory cardTokenUris,
-        address kryptorenaNftAddress,
-        uint256 mintFee,
+        //   string[] memory cardTokenUris,
+        //  address kryptorenaNftAddress,
+        //  uint256 mintFee,
         address kryptorenaBattleAddress
     ) VRFConsumerBaseV2(vrfCoordinatorV2) ConfirmedOwner(msg.sender) {
         i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
         i_subscriptionId = subscriptionId;
         i_gasLane = gasLane;
         i_callbackGasLimit = callbackGasLimit;
-        i_kryptorenaNft = KryptorenaNft(kryptorenaNftAddress);
-        i_mintFee = mintFee;
+        //i_kryptorenaNft = KryptorenaNft(kryptorenaNftAddress);
+        // i_mintFee = mintFee;
         i_kryptorenaBattle = KryptorenaBattle(kryptorenaBattleAddress);
     }
 
-    //     // register the player
+    // register the player
 
-    //     function registerNewPlayer(string memory _name) external payable returns (uint256 requestId) {
-    //         require(!isPlayer(msg.sender), "This address already registered");
-    //         require(msg.value >= i_mintFee, "Not enough AVAX");
+    // function registerNewPlayer(string memory _name) external payable returns (uint256 requestId) {
+    //     require(!isPlayer(msg.sender), "This address already registered");
+    //     require(msg.value >= i_mintFee, "Not enough AVAX");
 
-    //         i_kryptorenaNft.requestNft{value: msg.value}();
+    //     i_kryptorenaNft.requestNft{value: msg.value}();
 
-    //         uint _id = players.length;
-    //         players.push(Player(_name, msg.sender, false));
-    //         playerInfo[msg.sender] = _id;
+    //     uint _id = players.length;
+    //     players.push(Player(_name, msg.sender, false));
+    //     playerInfo[msg.sender] = _id;
 
-    //         requestId = i_vrfCoordinator.requestRandomWords(
-    //             i_gasLane,
-    //             i_subscriptionId,
-    //             REQUEST_CONFIRMATIONS,
-    //             i_callbackGasLimit,
-    //             NUM_WORDS
-    //         );
-    //         s_requestIdToSender[requestId] = msg.sender;
-    //         s_addressToUsername[msg.sender] = _name;
+    //     requestId = i_vrfCoordinator.requestRandomWords(
+    //         i_gasLane,
+    //         i_subscriptionId,
+    //         REQUEST_CONFIRMATIONS,
+    //         i_callbackGasLimit,
+    //         NUM_WORDS
+    //     );
+    //     s_requestIdToSender[requestId] = msg.sender;
+    //     s_addressToUsername[msg.sender] = _name;
 
-    //         emit newPlayer(msg.sender, _name);
-    //     }
+    //     emit newPlayer(msg.sender, _name);
+    // }
+
+    /**
+     *
+     * @dev This will trigger battle contract. Built it like this for now just for testing purposes.
+     */
+
+    struct forTesting {
+        address player1;
+        address player2;
+        uint256 player1AttackPoints;
+        uint256 player1DefensePoints;
+        uint256 player2AttackPoints;
+        uint256 player2DefensePoints;
+    }
+    forTesting test =
+        forTesting(
+            0xC9C4C378eB60de311B004783E47d683A74eE3756,
+            0x22fb1C7a7FAc8aD61b14c61d776C010C439aA078,
+            1,
+            10,
+            1,
+            10
+        );
+
+    function fakeJoinGameExtraStep() public {
+        initiateFromContract();
+    }
+
+    function initiateFromContract() public {
+        initiateBattle(
+            test.player1,
+            test.player2,
+            test.player1AttackPoints,
+            test.player1DefensePoints,
+            test.player2AttackPoints,
+            test.player2DefensePoints
+        );
+    }
+
+    function initiateBattle(
+        address player1,
+        address player2,
+        uint256 player1AttackPoints,
+        uint256 player1DefensePoints,
+        uint256 player2AttackPoints,
+        uint256 player2DefensePoints
+    ) public {
+        i_kryptorenaBattle.initiateBattle(
+            player1,
+            player2,
+            player1AttackPoints,
+            player1DefensePoints,
+            player2AttackPoints,
+            player2DefensePoints
+        );
+    }
 
     //     /**
     //      * @notice Battle contract will call this function to send winner's updated stats
