@@ -21,7 +21,7 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
 
     //Battle Variables
     enum AttackOrDefense {
-        GAME_START,
+        UNDEFINED,
         ATTACK,
         DEFEND
     }
@@ -44,12 +44,17 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         uint256 player2DefensePoints;
         AttackOrDefense player1Choice;
         AttackOrDefense player2Choice;
-        // uint256 turn;
     }
 
-    struct Result {
+    struct BattleData {
         endStatus player1;
         endStatus player2;
+        bool player1ChoiceMade;
+        bool player2ChoiceMade;
+        uint256 turn;
+        // uint256 matchDuration;
+        // uint256 lastTurnTimestamp;
+        // uint256 turnDuration;
     }
 
     /**
@@ -60,13 +65,14 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
 
     mapping(uint256 => Battle) public battles;
     mapping(address => Battle) public currentMatch;
-    mapping(uint256 => Result) public matchOutcome;
-    mapping(address => Result) public matchOutcomePlayerTracker;
+    mapping(uint256 => BattleData) public matchData;
+    mapping(address => BattleData) public matchDataPlayerTracker;
 
     mapping(uint256 => address) public s_requestIdToSender;
 
     uint256 public battleId;
     bool public initialized;
+    uint256 public constant MAX_TURNS = 5;
 
     event BattleResult(uint256 indexed battleId, address winner);
     event RngRequested(uint256 indexed requestId, address winner);
@@ -106,6 +112,8 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         uint256 player2AttackPoints,
         uint256 player2DefensePoints
     ) external {
+        //require that neither player is in another battle => Game logic contract can take care of this.
+        require(msg.sender == address(i_kryptorena));
         require(player1 != address(0), "Invalid player.");
         require(player2 != address(0), "Invalid player.");
 
@@ -120,23 +128,31 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
             10,
             player2AttackPoints,
             player2DefensePoints,
-            AttackOrDefense.GAME_START,
-            AttackOrDefense.GAME_START
+            AttackOrDefense.UNDEFINED,
+            AttackOrDefense.UNDEFINED
             // 0
         );
-        matchOutcome[battleId] = Result(endStatus.UNDEFINED, endStatus.UNDEFINED);
+        matchData[battleId] = BattleData(
+            endStatus.UNDEFINED,
+            endStatus.UNDEFINED,
+            false,
+            false,
+            0
+            // 60,
+            // block.timestamp,
+            // 15
+        );
 
         currentMatch[player1] = battles[battleId];
         currentMatch[player2] = battles[battleId];
 
-        matchOutcomePlayerTracker[player1] = matchOutcome[battleId];
-        matchOutcomePlayerTracker[player2] = matchOutcome[battleId];
+        matchDataPlayerTracker[player1] = matchData[battleId];
+        matchDataPlayerTracker[player2] = matchData[battleId];
 
         emit BattleCreated(battleId, player1, player2);
     }
 
     // TO DO:
-    // Require that for each attack and defend options that it is the player's respective turn and that the timer has not gone off
     // and that the battle is still active and that there does exist a battle between both addresses.
     // and that users HP is not zero
     // and that each user only takes one action per turn
@@ -148,51 +164,120 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
      */
     function attack() external {
         Battle storage round = currentMatch[msg.sender];
+        BattleData storage resultData = matchDataPlayerTracker[msg.sender];
+
+        // require(
+        //     block.timestamp <= resultData.lastTurnTimestamp + resultData.turnDuration,
+        //     "Turn time limit exceeded"
+        // );
+        require(resultData.turn <= MAX_TURNS, "There are no more turns to this match!");
+        require(
+            msg.sender == round.player1 || msg.sender == round.player2,
+            "Player is not in this battle"
+        );
+
         if (msg.sender == round.player1) {
             round.player1Choice = AttackOrDefense.ATTACK;
         } else {
             round.player2Choice = AttackOrDefense.ATTACK;
         }
-        // round.turn += 1;
-        // if (round.turn % 2 == 0) {
-        //     turnAction(msg.sender);
-        // }
     }
 
     function defend() external {
         Battle storage round = currentMatch[msg.sender];
+        BattleData storage resultData = matchDataPlayerTracker[msg.sender];
+
+        // require(
+        //     block.timestamp <= resultData.lastTurnTimestamp + resultData.turnDuration,
+        //     "Match time limit exceeded"
+        // );
+        require(resultData.turn <= MAX_TURNS, "There are no more turns to this match!");
+        require(
+            msg.sender == round.player1 || msg.sender == round.player2,
+            "Player is not in this battle"
+        );
+
         if (msg.sender == round.player1) {
             round.player1Choice = AttackOrDefense.DEFEND;
         } else {
             round.player2Choice = AttackOrDefense.DEFEND;
         }
-        // round.turn += 1;
-        // if (round.turn % 2 == 0) {
-        //     turnAction(msg.sender);
-        // }
     }
 
-    function turnAction(address player) private {
+    function turnAction(address player) private returns (string memory) {
+        BattleData storage resultData = matchDataPlayerTracker[msg.sender];
         Battle storage round = currentMatch[player];
+        string memory message;
         if (
             round.player1Choice == AttackOrDefense.ATTACK &&
             round.player2Choice == AttackOrDefense.ATTACK
-        ) {}
-        if (
+        ) {
+            round.player1HP = round.player1HP - int(round.player2AttackPoints);
+            round.player2HP = round.player2HP - int(round.player1AttackPoints);
+            message = "Both players attacked!";
+        } else if (
             round.player1Choice == AttackOrDefense.ATTACK &&
             round.player2Choice == AttackOrDefense.DEFEND
-        ) {}
-        if (
+        ) {
+            if (round.player2DefensePoints - round.player1AttackPoints > 0) {
+                round.player2HP =
+                    round.player2HP -
+                    int(round.player2DefensePoints - round.player1AttackPoints);
+            }
+            message = "Player 1 attacked and Player 2 defended!";
+        } else if (
             round.player1Choice == AttackOrDefense.DEFEND &&
             round.player2Choice == AttackOrDefense.ATTACK
-        ) {}
-        if (
+        ) {
+            if (round.player1DefensePoints - round.player2AttackPoints > 0) {
+                round.player1HP =
+                    round.player1HP -
+                    int(round.player1DefensePoints - round.player2AttackPoints);
+            }
+            message = "Player 1 defended and Player 2 attacked!";
+        } else if (
             round.player1Choice == AttackOrDefense.DEFEND &&
             round.player2Choice == AttackOrDefense.DEFEND
-        ) {}
-        if (round.player1HP == 0 || round.player2HP == 0 /**|| timer ENDS */) {
+        ) {
+            message = "Both players defended! No damage done.";
+        } else if (
+            round.player1Choice == AttackOrDefense.ATTACK &&
+            round.player2Choice == AttackOrDefense.UNDEFINED
+        ) {
+            round.player2HP = round.player2HP - int(round.player1AttackPoints);
+            message = "Player 1 attacked, Player 2 chose nothing!";
+        } else if (
+            round.player1Choice == AttackOrDefense.DEFEND &&
+            round.player2Choice == AttackOrDefense.UNDEFINED
+        ) {
+            message = "Player 1 defended, Player 2 chose nothing!";
+        } else if (
+            round.player1Choice == AttackOrDefense.UNDEFINED &&
+            round.player2Choice == AttackOrDefense.ATTACK
+        ) {
+            round.player1HP = round.player1HP - int(round.player2AttackPoints);
+            message = "Player 2 attacked, Player 1 chose nothing!";
+        } else if (
+            round.player1Choice == AttackOrDefense.UNDEFINED &&
+            round.player2Choice == AttackOrDefense.DEFEND
+        ) {
+            message = "Player 2 defended, Player 1 chose nothing!";
+        }
+
+        resultData.turn += 1;
+
+        if (round.player1HP < 0) {
+            round.player1HP = 0;
+        }
+        if (round.player2HP < 0) {
+            round.player1HP = 0;
+        }
+
+        if (round.player1HP == 0 || round.player2HP == 0 || resultData.turn == MAX_TURNS) {
             endGame(player);
         }
+
+        return message;
     }
 
     /**
@@ -201,8 +286,9 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
      */
 
     function endGame(address player) private {
+        //battle status ended
         Battle storage round = currentMatch[player];
-        Result storage resultData = matchOutcomePlayerTracker[player];
+        BattleData storage resultData = matchDataPlayerTracker[player];
         if (round.player1HP > round.player2HP) {
             resultData.player1 = endStatus.WON;
             resultData.player2 = endStatus.LOST;

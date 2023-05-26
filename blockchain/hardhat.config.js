@@ -51,8 +51,11 @@ module.exports = {
             //if using default network, use account (private key) in 0th position
             default: 0,
         },
-        player: {
+        player1: {
             default: 1,
+        },
+        player2: {
+            default: 2,
         },
     },
     gasReporter: {
