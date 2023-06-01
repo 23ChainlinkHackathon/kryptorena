@@ -37,6 +37,9 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
         log: true,
         waitConfirmations: network.config.blockConfirmations || 1,
     })
+    if (chainId == 31337) {
+        await vrfCoordinatorV2Mock.addConsumer(subscriptionId, Battle.address)
+    }
 
     log("--------------------------------------------------------------------------")
 
