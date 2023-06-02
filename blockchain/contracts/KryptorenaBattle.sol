@@ -32,6 +32,19 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
     uint32 private constant NUM_WORDS = 1;
 
     //Battle Variables
+    enum BattleStatus {
+        PENDING,
+        STARTED,
+        ENDED
+    }
+    
+    struct GameToken {
+        string name;
+        uint id;
+        uint atkStrength;
+        uint defStrength;
+    }
+
     enum AttackOrDefense {
         PENDING,
         ATTACK,
@@ -43,8 +56,17 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         LOST,
         DRAW
     }
+    
+     // struct BattleId {
+    //     uint id;
+    //     string name; //user defined
+    //     uint playerHealth; // lets keep it 10 in the beginning of each battle, will be changed after each attack or defence based on who won the round
+    //     uint attackPoints; // randomly by Chainlink vrfv2
+    //     uint defencePoints; // randomly by Chainlink vrfv2
+    // }
 
     struct Battle {
+        BattleStatus battleStatus;
         uint256 battleId;
         address player1;
         address player2;
@@ -57,6 +79,12 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         AttackOrDefense player1Choice;
         AttackOrDefense player2Choice;
     }
+
+    mapping(address => uint) public playerTokenInfo;
+    mapping(address => uint) public battleInfo;
+
+    GameToken[] public gameTokens;
+    Battle[] public battles;
 
     struct BattleData {
         endStatus player1;
@@ -74,15 +102,16 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
      * @notice 's_requestIdToSender' works with Chainlink VRF to keep track of message sender
      */
 
-    mapping(uint256 => Battle) public battles;
-    mapping(address => Battle) public currentMatch;
-    mapping(uint256 => BattleData) public matchData;
-    mapping(address => BattleData) public matchDataPlayerTracker;
-    mapping(uint256 => address) public s_requestIdToSender;
+    // mapping(uint256 => Battle) public battles;
+    // mapping(address => Battle) public currentMatch;
+    // mapping(uint256 => BattleData) public matchData;
+    // mapping(address => BattleData) public matchDataPlayerTracker;
+    // mapping(uint256 => address) public s_requestIdToSender;
 
     bool public initialized;
     uint256 public battleId;
     uint256 public constant MAX_TURNS = 5;
+
 
     event BattleResult(uint256 indexed battleId, address winner);
     event RngRequested(uint256 indexed requestId, address winner);
@@ -414,4 +443,44 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
             return -num;
         }
     }
+
+
+
+
+
+
+    // mapping(address => uint) public playerTokenInfo;
+    // mapping(address => uint) public battleInfo;
+
+    // GameToken[] public gameTokens;
+    // Battle[] public battles;
+
+
+    function quitGame(string memory _battleName) public {
+        Battle memory _battle = getBattle(_battleName);
+        require(_battle.players[0] == msg.sender || _battle.players[1] == msg.sender, "You fool! you are not in this game");
+        _battle.players[0] == msg.sender ? _endBattle(_battle.players[1], _battle) : endBattle(_battle.players[0], _battle);
+    }
+
+
+    function isPlayerToken(address addr) public view returns (bool) {
+        if(playerTokenInfo[addr] == 0) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+
+    
+
+    
+    // ______________________Functions to be modified in such a way______________
+
+    
+
+
+
+
+
 }

@@ -8,35 +8,19 @@ import "./KryptorenaNft.sol";
 import "./KryptorenaBattle.sol";
 
 contract Kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
-    enum GameStatus {
-        STARTED,
-        ENDED,
-        PENDING
-    } // describes the state of game
-
-    struct BattleId {
-        uint id;
-        string name; //user defined
-        uint playerHealth; // lets keep it 10 in the beginning of each battle, will be changed after each attack or defence based on who won the round
-        uint attackPoints; // randomly by Chainlink vrfv2
-        uint defencePoints; // randomly by Chainlink vrfv2
-    }
+    
+    // to store the details of player
     struct Player {
-        string playerName; // user defined
-        address playerAddress; // metamask address
-        bool inGame; // true if playing if by any chance player left the game, we need to put it false
+        address playerAddress;
+        string playerName;
+        uint playerHealth;
+        bool inBattle;
+        address nftImage;
     }
 
-    //     //storing the battle data
+    mapping(address => uint) public playerInfo;
+    Player[] public players;
 
-    struct Game {
-        GameStatus gameStatus;
-        string name; // to store name of battle
-        bytes32 battleHash; //store the hash of battle name, dont really know the use case...but might be needed later
-        address[2] playersInBattle; // to store the players in this battle
-        uint8[2] aod; //to store the choice of player: attack or defence
-        address winner; // storing the address of winner
-    }
 
     struct Play {
         uint index;
@@ -72,7 +56,7 @@ contract Kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
 
     //     // events
 
-    //     event newPlayer(address indexed owner, string name);
+        event NewPlayer(address indexed owner, string name);
     //     event newGame(string battleName, address indexed player1, address indexed player2);
     //     event gameEnded(string battleName, address indexed winner, address indexed defeated);
 
@@ -96,28 +80,28 @@ contract Kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
 
     // register the player
 
-    // function registerNewPlayer(string memory _name) external payable returns (uint256 requestId) {
-    //     require(!isPlayer(msg.sender), "This address already registered");
-    //     require(msg.value >= i_mintFee, "Not enough AVAX");
+    function registerPlayer(string memory _name, string memory _gameTokenName) external payable returns (uint256 requestId) {
+        require(!isPlayer(msg.sender), "This address already registered");
+        require(msg.value >= i_mintFee, "Not enough AVAX");
 
-    //     i_kryptorenaNft.requestNft{value: msg.value}();
+        i_kryptorenaNft.requestNft{value: msg.value}();
 
-    //     uint _id = players.length;
-    //     players.push(Player(_name, msg.sender, false));
-    //     playerInfo[msg.sender] = _id;
+        uint _id = players.length;
+        players.push(Player(_name, msg.sender, false));
+        playerInfo[msg.sender] = _id;
 
-    //     requestId = i_vrfCoordinator.requestRandomWords(
-    //         i_gasLane,
-    //         i_subscriptionId,
-    //         REQUEST_CONFIRMATIONS,
-    //         i_callbackGasLimit,
-    //         NUM_WORDS
-    //     );
-    //     s_requestIdToSender[requestId] = msg.sender;
-    //     s_addressToUsername[msg.sender] = _name;
+        requestId = i_vrfCoordinator.requestRandomWords(
+            i_gasLane,
+            i_subscriptionId,
+            REQUEST_CONFIRMATIONS,
+            i_callbackGasLimit,
+            NUM_WORDS
+        );
+        s_requestIdToSender[requestId] = msg.sender;
+        s_addressToUsername[msg.sender] = _name;
 
-    //     emit newPlayer(msg.sender, _name);
-    // }
+        emit NewPlayer(msg.sender, _name);
+    }
 
     /**
      *
@@ -294,4 +278,30 @@ contract Kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
     //             return true;
     //         }
     //     }
+
+
+
+
+    
+//    mapping(address => uint) public playerInfo;
+//     Player[] public players;
+// // 
+
+    function isPlayer(address _addr) public view returns (bool) {
+        if(playerInfo[_addr] == 0) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+    
+    function getPlayer(address _addr) public view returns (Player memory) {
+        require(isPlayer(_addr), "Oh no this player doesnt exist");
+        return players(playersInfo[_addr]);
+    }
+    
+    function getAllPlayers(address _addr) public view returns (Player[] memory) {
+        return players;
+    }
+
 }
