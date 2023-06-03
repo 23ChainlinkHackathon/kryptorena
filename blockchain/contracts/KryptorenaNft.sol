@@ -6,8 +6,11 @@ import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./Kryptorena.sol";
 
 contract KryptorenaNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
+    Kryptorena public i_kryptorena;
+
     //Chainlink VRF Variables
     VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
     uint64 private immutable i_subscriptionId;
@@ -21,6 +24,8 @@ contract KryptorenaNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
     string[] internal s_nftTokenUris;
     uint256 private immutable i_NFTTokenUriCount;
     uint256 private immutable i_mintFee;
+
+    bool public s_initialized;
 
     //VRF Helper
     /**
@@ -71,11 +76,11 @@ contract KryptorenaNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
      * @return requestId The ID of the VRF request.
      */
 
-    function requestNft() public payable returns (uint256 requestId) {
+    function requestNft(address player) public payable returns (uint256 requestId) {
         if (msg.value < i_mintFee) {
             revert KryptorenaNft__NeedMoreAVAXSent();
         }
-        if (hasMintedNFT[msg.sender]) {
+        if (hasMintedNFT[player]) {
             revert KryptorenaNft__AlreadyMintedNft();
         }
         requestId = i_vrfCoordinator.requestRandomWords(
@@ -85,8 +90,8 @@ contract KryptorenaNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
             i_callbackGasLimit,
             NUM_WORDS
         );
-        s_requestIdToSender[requestId] = msg.sender;
-        emit NftRequested(requestId, msg.sender);
+        s_requestIdToSender[requestId] = player;
+        emit NftRequested(requestId, player);
     }
 
     /**
@@ -105,6 +110,7 @@ contract KryptorenaNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
         s_addressToUri[nftOwner] = s_nftTokenUris[randomNumber];
         _safeMint(nftOwner, newTokenId);
         _setTokenURI(newTokenId, s_nftTokenUris[randomNumber]);
+        sendUriToKryptorena(nftOwner, s_addressToUri[nftOwner]);
         emit NftMinted(s_nftTokenUris[randomNumber], nftOwner);
     }
 
@@ -114,6 +120,16 @@ contract KryptorenaNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
         if (!success) {
             revert Kryptorena__TransferFailed();
         }
+    }
+
+    function initiateContract(address kryptorena) public onlyOwner {
+        require(!s_initialized, "Already initialized");
+        i_kryptorena = Kryptorena(kryptorena);
+        s_initialized = true;
+    }
+
+    function sendUriToKryptorena(address _player, string memory _uri) private {
+        i_kryptorena.registerAddressToUri(_player, _uri);
     }
 
     function getTokenCounter() public view returns (uint256) {

@@ -27,6 +27,8 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
     )
     const battleContract = await ethers.getContract("KryptorenaBattle")
     const battleContractAddress = battleContract.address
+    const nftContract = await ethers.getContract("KryptorenaNft")
+    const nftContractAddress = nftContract.address
 
     const gasLane = networkConfig[chainId]["gasLane"]
     const callbackGasLimit = networkConfig[chainId]["callbackGasLimit"]
@@ -37,6 +39,8 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
         subscriptionId,
         gasLane,
         callbackGasLimit,
+        nftContractAddress,
+        mintFee,
         battleContractAddress,
     ]
 

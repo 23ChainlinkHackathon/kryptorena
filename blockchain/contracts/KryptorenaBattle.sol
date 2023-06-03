@@ -228,7 +228,7 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
     }
 
     /**
-     * @dev When battle contract is deployed, we link it to the game logic contract through this function
+     * @dev When battle contract is deployed, we link it to kryptorena.sol contract through this function
      */
 
     function initiateContract(address kryptorena) public onlyOwner {
@@ -238,9 +238,8 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
     }
 
     /**
-     * @notice randomizes the new stats for winner depending on difference of HP
-     * Calls absoluteValue function to guarantee the difference of HP is a positive value.
-     * Returns new attack and defense values to game logic contract.
+     * @notice randomizes the new attack & defense stats for winner depending on difference of HP
+     *  between both players. Returns new attack and defense values to game logic contract.
      */
 
     function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override {
@@ -277,10 +276,10 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
 
     /**
      * @dev Executes battle logic depending on user's choice. Function only triggers when both players have taken a turn.
-     * @param player address of any player in order to reference the match that is ongoing
-     * Optional: If game is being held hostage chainlink automation can trigger this function. Status: PENDING
+     * @param player address of any player in order to call the battle that the player is in.
+     * Optional: If game is being held hostage chainlink automation can trigger this function. Status: PENDING IMPLEMENTATION
      * If any user's HP is zero or the amount of turns is equal to MAX_TURNS, it will trigger the endGame() function.
-     * Adds to match turn.
+     * Adds to match turn. Calls absoluteValue function to guarantee the difference of HP is a positive value.
      * Returns string message with players decision for better readability in front end.
      */
 
