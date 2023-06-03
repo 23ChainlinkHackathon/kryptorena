@@ -221,6 +221,7 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         uint256 id = s_playerToBattle[msg.sender].battleId;
         BattleFrame storage currentMatch = s_battleFrames[id];
         BattleData storage currentMatchData = s_battleData[id];
+        Battle memory battle = _battle[id];
 
         require(currentMatchData.battleStatus != endStatus.ENDED);
         require(currentMatchData.turn <= MAX_TURNS, "There are no more turns to this match!");
@@ -250,7 +251,7 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
             currentMatch.player1Choice != AttackOrDefense.PENDING &&
             currentMatch.player2Choice != AttackOrDefense.PENDING
         ) {
-            _resolveBattle(msg.sender);
+            _resolveBattle(msg.sender, battle);
         }
     }
 
@@ -258,6 +259,7 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         uint256 id = s_playerToBattle[msg.sender].battleId;
         BattleFrame storage currentMatch = s_battleFrames[id];
         BattleData storage currentMatchData = s_battleData[id];
+        Battle memory battle = _battle[id];
 
         require(currentMatchData.battleStatus != endStatus.ENDED);
         require(currentMatchData.turn <= MAX_TURNS, "There are no more turns to this match!");
@@ -287,7 +289,7 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
             currentMatch.player1Choice != AttackOrDefense.PENDING &&
             currentMatch.player2Choice != AttackOrDefense.PENDING
         ) {
-            _resolveBattle(msg.sender);
+            _resolveBattle(msg.sender, battle);
         }
     }
 
@@ -347,12 +349,19 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
      * Returns string message with players decision for better readability in front end.
      */
 
-    function _resolveBattle(address player) private returns (string memory) {
-        uint256 id = s_playerToBattle[msg.sender].battleId;
+    function _resolveBattle(
+        address player,
+        Battle memory __battle
+    ) private returns (string memory) {
+        uint256 id = s_playerToBattle[player].battleId;
         BattleFrame storage currentMatch = s_battleFrames[id];
         BattleData storage currentMatchData = s_battleData[id];
         Battle storage battle = _battle[id];
         string memory message;
+        if (battle.battleStatus == BattleStatus.ENDED) {
+            _endBattle(player, battle);
+        }
+
         if (
             currentMatch.player1Choice == AttackOrDefense.ATTACK &&
             currentMatch.player2Choice == AttackOrDefense.ATTACK
@@ -465,6 +474,9 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         BattleFrame storage currentMatch = s_battleFrames[id];
         BattleData storage currentMatchData = s_battleData[id];
         Battle storage battle = _battle[id];
+
+        battle.battleStatus = BattleStatus.ENDED;
+
         if (currentMatch.player1HP > currentMatch.player2HP) {
             currentMatchData.player1 = endStatus.WON;
             currentMatchData.player2 = endStatus.LOST;
@@ -494,16 +506,10 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
     }
 
     function quitBattle(string memory _battleName) public {
-        uint256 id = s_playerToBattle[msg.sender].battleId;
-        BattleFrame storage currentMatch = s_battleFrames[id];
+        Battle memory battle = _battle[id];
 
-        if (msg.sender == currentMatch.player1) {
-            currentMatch.player1HP = 0;
-            _resolveBattle(msg.sender);
-        } else if (msg.sender == currentMatch.player2) {
-            currentMatch.player2HP = 0;
-            _resolveBattle(msg.sender);
-        }
+        battle.battleStatus = BattleStatus.ENDED;
+        _resolveBattle(msg.sender, battle);
     }
 
     /**

@@ -97,6 +97,8 @@ contract Kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
          * @dev Need to make a require that battle can only be initiated by users who are not in ACTIVE battles.
          */
         function initiateBattle(
+            bytes32 battleHash,
+            string memory battleName,
             address player1,
             address player2,
             uint256 player1AttackPoints,
@@ -105,6 +107,8 @@ contract Kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
             uint256 player2DefensePoints
         ) public {
             i_kryptorenaBattle.initiateBattle(
+                battleHash,
+                battleName,
                 player1,
                 player2,
                 player1AttackPoints,
