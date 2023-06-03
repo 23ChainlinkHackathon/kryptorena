@@ -506,6 +506,8 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
     }
 
     function quitBattle(string memory _battleName) public {
+        uint256 id = s_playerToBattle[msg.sender].battleId;
+
         Battle memory battle = _battle[id];
 
         battle.battleStatus = BattleStatus.ENDED;
