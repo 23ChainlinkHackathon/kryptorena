@@ -32,6 +32,12 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
     uint32 private constant NUM_WORDS = 1;
 
     //Battle Variables
+    enum BattleStatus {
+        PENDING,
+        STARTED,
+        ENDED
+    }
+
     enum AttackOrDefense {
         PENDING,
         ATTACK,
@@ -43,6 +49,14 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         LOST,
         DRAW,
         ENDED
+    }
+    struct Battle {
+        BattleStatus battleStatus;
+        bytes32 battleHash;
+        string name;
+        address[2] players;
+        uint8[2] moves;
+        address winner;
     }
 
     struct BattleFrame {
@@ -74,18 +88,21 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
      * @notice 's_requestIdToSender' works with Chainlink VRF to keep track of message sender
      */
 
-    mapping(uint256 => BattleFrame) public s_battles;
+    mapping(uint256 => BattleFrame) public s_battleFrames;
     mapping(address => BattleFrame) public s_playerToBattle;
     mapping(uint256 => BattleData) public s_battleData;
     mapping(uint256 => address) public s_requestIdToSender;
+    mapping(uint256 => Battle) public _battle;
 
     bool public s_initialized;
     uint256 public s_battleId;
     uint256 public constant MAX_TURNS = 5;
 
-    event BattleResult(uint256 indexed battleId, address winner);
+    event BattleEnded(string battleName, address indexed winner, address indexed loser);
+    event BattleMove(string indexed battleName, uint8 indexed isFirstMove);
     event RngRequested(uint256 indexed requestId, address winner);
     event BattleCreated(uint256 indexed battleId, address player1, address player2);
+    event RoundEnded(address[2] damagedPlayers);
 
     constructor(
         address vrfCoordinatorV2,
@@ -101,12 +118,50 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         s_initialized = false;
     }
 
+    function attackOrDefendChoice(uint8 _choice, string memory _battleName) external {
+        //0 for attack, 1 for defense
+        uint256 id = s_playerToBattle[msg.sender].battleId;
+        Battle storage battle = _battle[id];
+        uint8 isFirstMove = _choice;
+        if (isFirstMove == 0) {
+            attack();
+        } else if (isFirstMove == 1) {
+            defend();
+        }
+        _registerPlayerMove(battle.players[0] == msg.sender ? 0 : 1, _choice, _battleName);
+        emit BattleMove(_battleName, isFirstMove);
+    }
+
+    function _registerPlayerMove(
+        uint256 _player,
+        uint8 _choice,
+        string memory _battleName
+    ) internal {
+        uint256 id = s_playerToBattle[msg.sender].battleId;
+        Battle storage battle = _battle[id];
+        battle.moves[_player] = _choice;
+    }
+
+    function getBattleMoves(
+        string memory _battleName
+    ) public view returns (uint256 P1Move, uint256 P2Move) {
+        uint256 id = s_playerToBattle[msg.sender].battleId;
+        Battle storage battle = _battle[id];
+
+        P1Move = battle.moves[0];
+        P2Move = battle.moves[1];
+
+        return (P1Move, P2Move);
+    }
+
     /**
      * @dev arguements come from game logic contract
      * @dev mapping of battleId to Battle Struct is used to track the match between specific addresses (players)
      * @dev s_playerToBattle[address] is used with battleId and Battle struct to call match details with player's address.
      */
     function initiateBattle(
+        bytes32 battleHash,
+        string memory battleName,
         address player1,
         address player2,
         uint256 player1AttackPoints,
@@ -120,7 +175,7 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         require(player2 != address(0), "Invalid player.");
 
         s_battleId++;
-        s_battles[s_battleId] = BattleFrame(
+        s_battleFrames[s_battleId] = BattleFrame(
             s_battleId,
             player1,
             player2,
@@ -134,6 +189,15 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
             AttackOrDefense.PENDING
             // 0
         );
+        _battle[s_battleId] = Battle(
+            BattleStatus.STARTED,
+            battleHash,
+            battleName,
+            [player1, player2],
+            [0, 0],
+            address(0)
+        );
+
         s_battleData[s_battleId] = BattleData(
             endStatus.ONGOING,
             endStatus.ONGOING,
@@ -142,8 +206,8 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
             0
         );
 
-        s_playerToBattle[player1] = s_battles[s_battleId];
-        s_playerToBattle[player2] = s_battles[s_battleId];
+        s_playerToBattle[player1] = s_battleFrames[s_battleId];
+        s_playerToBattle[player2] = s_battleFrames[s_battleId];
 
         emit BattleCreated(s_battleId, player1, player2);
     }
@@ -153,9 +217,9 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
      * It also tracks the choice of the player for the current turn.
      * It successfully calls on turnAction if both players have made a choice.
      */
-    function attack() external {
+    function attack() public {
         uint256 id = s_playerToBattle[msg.sender].battleId;
-        BattleFrame storage currentMatch = s_battles[id];
+        BattleFrame storage currentMatch = s_battleFrames[id];
         BattleData storage currentMatchData = s_battleData[id];
 
         require(currentMatchData.battleStatus != endStatus.ENDED);
@@ -186,13 +250,13 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
             currentMatch.player1Choice != AttackOrDefense.PENDING &&
             currentMatch.player2Choice != AttackOrDefense.PENDING
         ) {
-            turnAction(msg.sender);
+            _resolveBattle(msg.sender);
         }
     }
 
-    function defend() external {
+    function defend() public {
         uint256 id = s_playerToBattle[msg.sender].battleId;
-        BattleFrame storage currentMatch = s_battles[id];
+        BattleFrame storage currentMatch = s_battleFrames[id];
         BattleData storage currentMatchData = s_battleData[id];
 
         require(currentMatchData.battleStatus != endStatus.ENDED);
@@ -223,7 +287,7 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
             currentMatch.player1Choice != AttackOrDefense.PENDING &&
             currentMatch.player2Choice != AttackOrDefense.PENDING
         ) {
-            turnAction(msg.sender);
+            _resolveBattle(msg.sender);
         }
     }
 
@@ -249,7 +313,7 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         uint256 id = s_playerToBattle[winner].battleId;
         BattleData storage currentMatchData = s_battleData[id];
 
-        BattleFrame storage currentMatch = s_battles[id];
+        BattleFrame storage currentMatch = s_battleFrames[id];
         uint256 s_HP_DIFFERENCE = currentMatchData.hpDifference;
 
         uint256 rngAttackValue = randomNumber % s_HP_DIFFERENCE;
@@ -283,10 +347,11 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
      * Returns string message with players decision for better readability in front end.
      */
 
-    function turnAction(address player) private returns (string memory) {
+    function _resolveBattle(address player) private returns (string memory) {
         uint256 id = s_playerToBattle[msg.sender].battleId;
-        BattleFrame storage currentMatch = s_battles[id];
+        BattleFrame storage currentMatch = s_battleFrames[id];
         BattleData storage currentMatchData = s_battleData[id];
+        Battle storage battle = _battle[id];
         string memory message;
         if (
             currentMatch.player1Choice == AttackOrDefense.ATTACK &&
@@ -376,8 +441,11 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
             );
             currentMatchData.hpDifference = uint256(int_HP_DIFFERENCE);
             currentMatchData.battleStatus = endStatus.ENDED;
-            endGame(player);
+            _endBattle(player, battle);
         }
+        address[2] memory _damagedPlayers = [currentMatch.player1, currentMatch.player2];
+
+        emit RoundEnded(_damagedPlayers);
 
         return message;
     }
@@ -390,33 +458,52 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
      * @param player address of any player in order to reference the match that is ongoing
      */
 
-    function endGame(address player) private {
+    function _endBattle(address player, Battle memory __battle) private {
         //battle status ended
 
         uint256 id = s_playerToBattle[player].battleId;
-        BattleFrame storage currentMatch = s_battles[id];
+        BattleFrame storage currentMatch = s_battleFrames[id];
         BattleData storage currentMatchData = s_battleData[id];
+        Battle storage battle = _battle[id];
         if (currentMatch.player1HP > currentMatch.player2HP) {
             currentMatchData.player1 = endStatus.WON;
             currentMatchData.player2 = endStatus.LOST;
+            battle.winner = currentMatch.player1;
         } else if (currentMatch.player1HP == currentMatch.player2HP) {
             currentMatchData.player2 = currentMatchData.player1 = endStatus.DRAW;
         } else {
             currentMatchData.player1 = endStatus.LOST;
             currentMatchData.player2 = endStatus.WON;
+            battle.winner = currentMatch.player2;
         }
         address winner;
+        address loser;
         if (currentMatchData.player1 == endStatus.WON) {
             winner = currentMatch.player1;
+            loser = currentMatch.player2;
             requestRandomWord(winner);
         } else if (currentMatchData.player2 == endStatus.WON) {
             winner = currentMatch.player2;
+            loser = currentMatch.player1;
             requestRandomWord(winner);
         } else {
             winner = address(0);
             i_kryptorena.updateStats(address(0), 0, 0);
         }
-        emit BattleResult(currentMatch.battleId, winner);
+        emit BattleEnded(battle.name, winner, loser);
+    }
+
+    function quitBattle(string memory _battleName) public {
+        uint256 id = s_playerToBattle[msg.sender].battleId;
+        BattleFrame storage currentMatch = s_battleFrames[id];
+
+        if (msg.sender == currentMatch.player1) {
+            currentMatch.player1HP = 0;
+            _resolveBattle(msg.sender);
+        } else if (msg.sender == currentMatch.player2) {
+            currentMatch.player2HP = 0;
+            _resolveBattle(msg.sender);
+        }
     }
 
     /**
