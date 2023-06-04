@@ -267,4 +267,33 @@ contract Kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
     function getPlayerURI(address _player) public returns (string memory) {
         return s_addressToUri[_player];
     }
+
+    /**
+     *
+     * @dev This will trigger battle contract. Built it like this for now just for testing purposes.
+     * @dev Need to make a require that battle can only be initiated by users who are not in ACTIVE battles.
+     */
+
+    function triggerBattle() public {
+        bytes32 battleHash = keccak256(abi.encode(""));
+        string memory battleName = "";
+        // address p1 = 0xC9C4C378eB60de311B004783E47d683A74eE3756;
+        // address p2 = 0x22fb1C7a7FAc8aD61b14c61d776C010C439aA078;
+        address p1Hardhat = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
+        address p2Hardhat = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC;
+        uint256 p1Attack = 3;
+        uint256 p1Defend = 1;
+        uint256 p2Attack = 2;
+        uint256 p2Defend = 5;
+        initiateBattle(
+            battleHash,
+            battleName,
+            p1Hardhat,
+            p2Hardhat,
+            p1Attack,
+            p1Defend,
+            p2Attack,
+            p2Defend
+        );
+    }
 }

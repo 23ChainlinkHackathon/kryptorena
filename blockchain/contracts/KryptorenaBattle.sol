@@ -50,6 +50,14 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         DRAW,
         ENDED
     }
+
+    struct GameToken {
+        string name;
+        uint id;
+        uint atkStrength;
+        uint defStrength;
+    }
+
     struct Battle {
         BattleStatus battleStatus;
         bytes32 battleHash;
@@ -93,13 +101,18 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
     mapping(uint256 => BattleData) public s_battleData;
     mapping(uint256 => address) public s_requestIdToSender;
     mapping(uint256 => Battle) public _battle;
+    mapping(address => uint) public playerTokenInfo;
+    mapping(address => uint) public battleInfo;
+
+    GameToken[] public gameTokens;
+    Battle[] public battles;
 
     bool public s_initialized;
     uint256 public s_battleId;
     uint256 public constant MAX_TURNS = 5;
 
     event BattleEnded(string battleName, address indexed winner, address indexed loser);
-    event BattleMove(string indexed battleName, uint8 indexed isFirstMove);
+    event BattleMove(string indexed battleName, bool indexed isFirstMove);
     event RngRequested(uint256 indexed requestId, address winner);
     event BattleCreated(uint256 indexed battleId, address player1, address player2);
     event RoundEnded(address[2] damagedPlayers);
@@ -122,14 +135,14 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         //0 for attack, 1 for defense
         uint256 id = s_playerToBattle[msg.sender].battleId;
         Battle storage battle = _battle[id];
-        uint8 isFirstMove = _choice;
-        if (isFirstMove == 0) {
+        if (_choice == 0) {
             attack();
-        } else if (isFirstMove == 1) {
+        } else if (_choice == 1) {
             defend();
         }
+        uint _movesLeft = 2 - (battle.moves[0] == 0 ? 0 : 1) - (battle.moves[1] == 0 ? 0 : 1);
         _registerPlayerMove(battle.players[0] == msg.sender ? 0 : 1, _choice, _battleName);
-        emit BattleMove(_battleName, isFirstMove);
+        emit BattleMove(_battleName, _movesLeft == 1 ? true : false);
     }
 
     function _registerPlayerMove(
@@ -170,7 +183,7 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
         uint256 player2DefensePoints
     ) external {
         //require that neither player is in another battle => Game logic contract can take care of this.
-        require(msg.sender == address(i_kryptorena));
+        // require(msg.sender == address(i_kryptorena), "Battle must be initiated from kryptorena.sol");
         require(player1 != address(0), "Invalid player.");
         require(player2 != address(0), "Invalid player.");
 
@@ -541,6 +554,14 @@ contract KryptorenaBattle is VRFConsumerBaseV2, Ownable {
             return num;
         } else {
             return -num;
+        }
+    }
+
+    function isPlayerToken(address addr) public view returns (bool) {
+        if (playerTokenInfo[addr] == 0) {
+            return false;
+        } else {
+            return true;
         }
     }
 }
