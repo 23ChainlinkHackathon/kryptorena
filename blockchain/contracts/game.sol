@@ -1,41 +1,62 @@
+// SPDX-License-Identifier: MIT
 
-contract Game {
+pragma solidity ^0.8.16;
 
-    enum BattleStatus{ PENDING, STARTED, ENDED }
+import '@openzeppelin/contracts/token/ERC1155/ERC1155.sol';
+import '@openzeppelin/contracts/access/Ownable.sol';
+import '@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol';
 
-    struct GameToken { // BattleId
-        string name; 
-        uint256 id; 
-        uint256 attackStrength; 
-        uint256 defenseStrength;     
-    }
 
-    struct Player {
-        address playerAddress; /// @param playerAddress player wallet address
-        string playerName; /// @param playerName player name; set by player during registration
-        uint256 playerMana; /// @param playerMana player mana; affected by battle results
-        uint256 playerHealth; /// @param playerHealth player health; affected by battle results
-        bool inBattle; /// @param inBattle boolean to indicate if a player is in battle
-    }
+contract Kryptorena is ERC1155, Ownable, ERC1155Supply {
+  string public baseURI; 
+  uint256 public totalSupply;
+  uint256 public constant DEVIL = 0;
+  uint256 public constant GRIFFIN = 1; 
+  uint256 public constant FIREBIRD = 2;
+  uint256 public constant KAMO = 3;
+  uint256 public constant KUKULKAN = 4;
+  uint256 public constant CELESTION = 5;
 
-    struct Battle {
-        BattleStatus battleStatus; 
-        bytes32 battleHash;
-        string name;  
-        address[2] players;
-        uint8[2] moves; 
-        address winner; 
-    }
+  uint256 public constant MAX_ATTACK_DEFEND_STRENGTH = 10;
 
-    mapping(address => uint256) public playerInfo;
-    mapping(address => uint256) public playerTokenInfo; 
-    mapping(string => uint256) public battleInfo; 
+  enum BattleStatus{ PENDING, STARTED, ENDED }
 
-    Player[] public players;
-    GameToken[] public gameTokens;
-    Battle[] public battles; 
+  
+  struct GameToken { // BattleId
+    string name; 
+    uint256 id; 
+    uint256 attackStrength;
+    uint256 defenseStrength; 
+  }
 
-    function isPlayer(address addr) public view returns (bool) { 
+  /// @dev Player struct to store player info
+  struct Player {
+    address playerAddress; 
+    string playerName;
+    uint256 playerMana;
+    uint256 playerHealth;
+    bool inBattle;
+  }
+
+  
+  struct Battle {
+    BattleStatus battleStatus;
+    bytes32 battleHash;
+    string name; 
+    address[2] players; 
+    uint8[2] moves;
+    address winner;
+  }
+
+  mapping(address => uint256) public playerInfo;
+  mapping(address => uint256) public playerTokenInfo; 
+  mapping(string => uint256) public battleInfo;
+
+  Player[] public players;
+  GameToken[] public gameTokens; 
+  Battle[] public battles; 
+
+  function isPlayer(address addr) public view returns (bool) { 
     if(playerInfo[addr] == 0) {
       return false;
     } else {
@@ -69,7 +90,7 @@ contract Game {
     return gameTokens;
   }
 
-  // Battle getter function
+  
   function isBattle(string memory _name) public view returns (bool) {
     if(battleInfo[_name] == 0) {
       return false;
@@ -92,35 +113,42 @@ contract Game {
     battles[battleInfo[_name]] = _newBattle;
   }
 
-  // Events
-    event NewPlayer(address indexed owner, string name);
-    event NewBattle(string battleName, address indexed player1, address indexed player2);
-    event BattleEnded(string battleName, address indexed winner, address indexed loser);
-    event BattleMove(string indexed battleName, bool indexed isFirstMove);
-    event NewGameToken(address indexed owner, uint256 id, uint256 attackStrength, uint256 defenseStrength);
-    event RoundEnded(address[2] damagedPlayers);
+  event NewPlayer(address indexed owner, string name);
+  event NewBattle(string battleName, address indexed player1, address indexed player2);
+  event BattleEnded(string battleName, address indexed winner, address indexed loser);
+  event BattleMove(string indexed battleName, bool indexed isFirstMove);
+  event NewGameToken(address indexed owner, uint256 id, uint256 attackStrength, uint256 defenseStrength);
+  event RoundEnded(address[2] damagedPlayers);
 
-    function initialize() private {
+  
+  constructor(string memory _metadataURI) ERC1155(_metadataURI) {
+    baseURI = _metadataURI; // Set baseURI
+    initialize();
+  }
+
+  function setURI(string memory newuri) public onlyOwner {
+    _setURI(newuri);
+  }
+
+  function initialize() private {
     gameTokens.push(GameToken("", 0, 0, 0));
     players.push(Player(address(0), "", 0, 0, false));
     battles.push(Battle(BattleStatus.PENDING, bytes32(0), "", [address(0), address(0)], [0, 0], address(0)));
   }
 
-  /// @dev Registers a player 
-  /// @param _name player name; set by player
   function registerPlayer(string memory _name, string memory _gameTokenName) external {
-    require(!isPlayer(msg.sender), "Player already registered"); // Require that player is not already registered
-    
+    require(!isPlayer(msg.sender), "Player already registered"); 
     uint256 _id = players.length;
-    players.push(Player(msg.sender, _name, 10, 25, false)); // Adds player to players array
-    playerInfo[msg.sender] = _id; // Creates player info mapping
+    players.push(Player(msg.sender, _name, 10, 25, false)); 
+    playerInfo[msg.sender] = _id;
 
     createRandomGameToken(_gameTokenName);
+
     
-    emit NewPlayer(msg.sender, _name); // Emits NewPlayer event
+    emit NewPlayer(msg.sender, _name); 
   }
 
-  /// @dev internal function to generate random number; used for Battle Card Attack and Defense Strength
+  
   function _createRandomNum(uint256 _max, address _sender) internal view returns (uint256 randomValue) {
     uint256 randomNum = uint256(keccak256(abi.encodePacked(block.difficulty, block.timestamp, _sender)));
 
@@ -132,7 +160,6 @@ contract Game {
     return randomValue;
   }
 
-  /// @dev internal function to create a new Battle Card
   function _createGameToken(string memory _name) internal returns (GameToken memory) {
     uint256 randAttackStrength = _createRandomNum(MAX_ATTACK_DEFEND_STRENGTH, msg.sender);
     uint256 randDefenseStrength = MAX_ATTACK_DEFEND_STRENGTH - randAttackStrength;
@@ -161,13 +188,11 @@ contract Game {
     return newGameToken;
   }
 
-  /// @dev Creates a new game token
-  /// @param _name game token name; set by player
   function createRandomGameToken(string memory _name) public {
-    require(!getPlayer(msg.sender).inBattle, "Player is in a battle"); // Require that player is not already in a battle
-    require(isPlayer(msg.sender), "Please Register Player First"); // Require that the player is registered
+    require(!getPlayer(msg.sender).inBattle, "Player is in a battle"); 
+    require(isPlayer(msg.sender), "Please Register Player First"); 
     
-    _createGameToken(_name); // Creates game token
+    _createGameToken(_name); 
   }
 
   function getTotalSupply() external view returns (uint256) {
@@ -177,18 +202,18 @@ contract Game {
   /// @dev Creates a new battle
   /// @param _name battle name; set by player
   function createBattle(string memory _name) external returns (Battle memory) {
-    require(isPlayer(msg.sender), "Please Register Player First"); // Require that the player is registered
-    require(!isBattle(_name), "Battle already exists!"); // Require battle with same name should not exist
+    require(isPlayer(msg.sender), "Please Register Player First"); 
+    require(!isBattle(_name), "Battle already exists!"); 
 
     bytes32 battleHash = keccak256(abi.encode(_name));
     
     Battle memory _battle = Battle(
-      BattleStatus.PENDING, // Battle pending
-      battleHash, // Battle hash
-      _name, // Battle name
-      [msg.sender, address(0)], // player addresses; player 2 empty until they joins battle
-      [0, 0], // moves for each player
-      address(0) // winner address; empty until battle ends
+      BattleStatus.PENDING, 
+      battleHash, 
+      _name, 
+      [msg.sender, address(0)], 
+      [0, 0],
+      address(0)
     );
 
     uint256 _id = battles.length;
@@ -198,14 +223,11 @@ contract Game {
     return _battle;
   }
 
-  /// @dev Player joins battle
-  /// @param _name battle name; name of battle player wants to join
   function joinBattle(string memory _name) external returns (Battle memory) {
     Battle memory _battle = getBattle(_name);
-
-    require(_battle.battleStatus == BattleStatus.PENDING, "Battle already started!"); // Require that battle has not started
-    require(_battle.players[0] != msg.sender, "Only player two can join a battle"); // Require that player 2 is joining the battle
-    require(!getPlayer(msg.sender).inBattle, "Already in battle"); // Require that player is not already in a battle
+// Require that battle has not started
+    require(_battle.players[0] != msg.sender, "Only player two can join a battle"); 
+    require(!getPlayer(msg.sender).inBattle, "Already in battle"); 
     
     _battle.battleStatus = BattleStatus.STARTED;
     _battle.players[1] = msg.sender;
@@ -214,11 +236,10 @@ contract Game {
     players[playerInfo[_battle.players[0]]].inBattle = true;
     players[playerInfo[_battle.players[1]]].inBattle = true;
 
-    emit NewBattle(_battle.name, _battle.players[0], msg.sender); // Emits NewBattle event
+    emit NewBattle(_battle.name, _battle.players[0], msg.sender); 
     return _battle;
   }
 
-  // Read battle move info for player 1 and player 2
   function getBattleMoves(string memory _battleName) public view returns (uint256 P1Move, uint256 P2Move) {
     Battle memory _battle = getBattle(_battleName);
 
@@ -289,8 +310,6 @@ contract Game {
     uint defense;
   }
 
-  /// @dev Resolve battle function to determine winner and loser of battle
-  /// @param _battle battle; battle to resolve
   function _resolveBattle(Battle memory _battle) internal {
     P memory p1 = P(
         playerInfo[_battle.players[0]],
@@ -388,7 +407,9 @@ contract Game {
 
     uint256 _randomAttackStrengthPlayer2 = _createRandomNum(MAX_ATTACK_DEFEND_STRENGTH, _battle.players[1]);
     gameTokens[playerTokenInfo[_battle.players[1]]].attackStrength = _randomAttackStrengthPlayer2;
-    gameTokens[playerTokenInfo[_battle.players[1]]].defenseStrength = MAX_ATTACK_DEFEND_STRENGTH - _randomAttackStrengthPlayer2;   
+    gameTokens[playerTokenInfo[_battle.players[1]]].defenseStrength = MAX_ATTACK_DEFEND_STRENGTH - _randomAttackStrengthPlayer2;  
+
+
   }
 
   function quitBattle(string memory _battleName) public {
@@ -398,9 +419,6 @@ contract Game {
     _battle.players[0] == msg.sender ? _endBattle(_battle.players[1], _battle) : _endBattle(_battle.players[0], _battle);
   }
 
-  /// @dev internal function to end the battle
-  /// @param battleEnder winner address
-  /// @param _battle battle; taken from attackOrDefend function
   function _endBattle(address battleEnder, Battle memory _battle) internal returns (Battle memory) {
     require(_battle.battleStatus != BattleStatus.ENDED, "Battle already ended"); // Require that battle has not ended
 
@@ -421,12 +439,14 @@ contract Game {
 
     address _battleLoser = battleEnder == _battle.players[0] ? _battle.players[1] : _battle.players[0];
 
-    emit BattleEnded(_battle.name, battleEnder, _battleLoser); // Emits BattleEnded event
+    emit BattleEnded(_battle.name, battleEnder, _battleLoser); 
+
+    // upgrade nft code here
+
 
     return _battle;
   }
 
-  // Turns uint256 into string
   function uintToStr(uint256 _i) internal pure returns (string memory _uintAsString) {
     if (_i == 0) {
       return '0';
@@ -454,7 +474,7 @@ contract Game {
     return string(abi.encodePacked(baseURI, '/', uintToStr(tokenId), '.json'));
   }
 
-  // The following functions are overrides required by Solidity.
+  
   function _beforeTokenTransfer(
     address operator,
     address from,
@@ -465,8 +485,8 @@ contract Game {
   ) internal override(ERC1155, ERC1155Supply) {
     super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
   }
-}
 
 
+  // new function for upgrading nft
 
 }

@@ -99,7 +99,7 @@ contract Kryptorena is VRFConsumerBaseV2, ConfirmedOwner {
         );
         s_requestIdToSender[requestId] = msg.sender;
         s_addressToUsername[msg.sender] = _name;
-
+ 
         emit NewPlayer(msg.sender, _name);
     }
 
