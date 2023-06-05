@@ -11,9 +11,21 @@ const metadataTemplate = {
 }
 
 let tokenUris = [
-    "ipfs://QmV1SBgXAKNU6EcVP5EwTUEx4E4k2H6X5RhmvEBcTQ31Q8",
-    "ipfs://QmPwmVUSQmdj7LxBKe4hT7KfarcpqYAEkaMssWQL4sCFPb",
-    "ipfs://QmXisMZfUkbz79KjGDVEeBFgMPMz5N6LGg8zHbmD1HLbTB",
+    "ipfs://QmQkZbQ6GDFZqRDeSYGwjaAWoPobsLtYPyJCB1rQvkwwiH",
+    "ipfs://QmUYAwb6sPX5ER2czMoWYmuY2wpbi9n3YcJpeZvfJY5JsL",
+    "ipfs://QmbhYo8qroKXLQYQtRj3uVCBen1zVTKHaBkQTcznsnKMBs",
+    "ipfs://QmWHXWb8SeUUx7sGX3L9vNQcg3AWqYrpsiFUELESb6Gucq",
+    "ipfs://QmQmRNXSWxmNpN8StDFxhcWRFgRRc8zjsYXk8TDLqC7ToE",
+    "ipfs://QmYqUS7tSk2dmHVi2nb4s5BCPFy3u3ZVqXyeZ6VMB5toXq",
+    "ipfs://QmTT2y3sZWQvrkcEcNuk1cXZfmnCGShkWBiMTV5LpbNT72",
+    "ipfs://QmTXoEyG2Ro6FmSVfc6bbRBvHwAgR6L8kTpiM6WjxD5Kp7",
+    "ipfs://QmRxbsimpNWxMrX5S449358S1KqFhKg9ZWy3xn2P3E8x4D",
+    "ipfs://QmbwDRexprXkn43EoaqF3LCSR4pbzZdtSC2o9poNw9dcEm",
+    "ipfs://QmQzB6jsPv6LPtvWjdRS7d3TfgrcmsZVSmuZDhvwindieJ",
+    "ipfs://Qma3Ze6cmPF23GdGrJWbKSPf8Gge7ptEdQ8u2Et2twuxXm",
+    "ipfs://QmSuixLfj3khpCY6ryytyKWGiVqBECpcMNCjrtDQh6btbd",
+    "ipfs://QmctoKtadYKp7sH5SQKDKq1eaZERU7mYw1TaU21SAWVKAn",
+    "ipfs://QmehLD7HwKfTBjnKBAuGxziabABUZH8gbH2qpVRcsLCwNd",
 ]
 
 const FUND_AMOUNT = "1000000000000000000000"
@@ -77,8 +89,8 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
         const { responses: imageUploadResponses, files } = await storeImages(imagesLocation)
         for (index in imageUploadResponses) {
             let tokenUriMetadata = { ...metadataTemplate }
-            tokenUriMetadata.name = files[index].replace(".jpg", "")
-            tokenUriMetadata.description = `An adorable ${tokenUriMetadata.name} animal!`
+            tokenUriMetadata.name = files[index].replace(".png", "")
+            tokenUriMetadata.description = `${tokenUriMetadata.name}`
             tokenUriMetadata.image = `ipfs://${imageUploadResponses[index].IpfsHash}`
             console.log(`Uploading ${tokenUriMetadata.name}...`)
             const metadataUploadResponse = await storeTokenUriMetadata(tokenUriMetadata)
