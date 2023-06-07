@@ -6,8 +6,18 @@ import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./Kryptorena.sol";
+
+/**
+ * @title KryptorenaNft
+ * @author Roberto Iturralde
+ * @notice random NFT contract with Chainlink VRF functionality. This contract will only be called through
+ * Kryptorena main contract when a user registers and requests to mint an NFT.
+ */
 
 contract KryptorenaNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
+    Kryptorena i_kryptorena;
+
     //Chainlink VRF Variables
     VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
     uint64 private immutable i_subscriptionId;
@@ -71,11 +81,12 @@ contract KryptorenaNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
      * @return requestId The ID of the VRF request.
      */
 
-    function requestNft() public payable returns (uint256 requestId) {
+    function requestNft(address player) public payable returns (uint256 requestId) {
+        require(msg.sender == address(i_kryptorena), "Unauthorized user");
         if (msg.value < i_mintFee) {
             revert KryptorenaNft__NeedMoreAVAXSent();
         }
-        if (hasMintedNFT[msg.sender]) {
+        if (hasMintedNFT[player]) {
             revert KryptorenaNft__AlreadyMintedNft();
         }
         requestId = i_vrfCoordinator.requestRandomWords(
@@ -85,8 +96,8 @@ contract KryptorenaNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
             i_callbackGasLimit,
             NUM_WORDS
         );
-        s_requestIdToSender[requestId] = msg.sender;
-        emit NftRequested(requestId, msg.sender);
+        s_requestIdToSender[requestId] = player;
+        emit NftRequested(requestId, player);
     }
 
     /**
@@ -114,6 +125,10 @@ contract KryptorenaNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
         if (!success) {
             revert Kryptorena__TransferFailed();
         }
+    }
+
+    function initializeContract(address _kryptorenaAddress) public onlyOwner {
+        i_kryptorena = Kryptorena(_kryptorenaAddress);
     }
 
     function getTokenCounter() public view returns (uint256) {
