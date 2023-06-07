@@ -3,7 +3,6 @@ import Battle from './Battle';
 import Battleground from './Battleground';
 import CreateBattle from './CreateBattle';
 import JoinBattle from './JoinBattle';
-import LandingPage from './LandingPage';
 
 export {
   Battle,
@@ -11,5 +10,4 @@ export {
   Battleground,
   CreateBattle,
   JoinBattle,
-  LandingPage,
 };

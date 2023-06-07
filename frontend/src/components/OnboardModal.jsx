@@ -39,8 +39,8 @@ const OnboardModal = () => {
               You don't have Metamask Wallet installed!
             </p>
             <CustomButton
-              title="Download Metamask"
-              handleClick={() => window.open('https://metamask.io/download/', '_blank')}
+              title="Download Core"
+              handleClick={() => window.open('https://core.app/', '_blank')}
             />
           </>
         );
@@ -52,7 +52,7 @@ const OnboardModal = () => {
               You haven't connected your account to Metamask Wallet!
             </p>
             <CustomButton
-              title="Connect Wallet"
+              title="Connect Account"
               handleClick={updateCurrentWalletAddress}
             />
           </>
@@ -62,7 +62,7 @@ const OnboardModal = () => {
         return (
           <>
             <p className={styles.modalText}>
-              You're on a different network. Switch to Avalanche.
+              You're on a different network. Switch to Fuji C-Chain.
             </p>
             <CustomButton title="Switch" handleClick={SwitchNetwork} />
           </>

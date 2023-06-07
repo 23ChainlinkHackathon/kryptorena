@@ -1,3 +1,4 @@
+/* eslint-disable prefer-destructuring */
 function isEthereum() {
   if (window.ethereum) {
     return true;
@@ -96,7 +97,7 @@ export const GetParams = async () => {
 export async function SwitchNetwork() {
   await window?.ethereum?.request({
     method: 'wallet_addEthereumChain',
-    params: [{  
+    params: [{
       chainId: '0xA869',
       chainName: 'Fuji C-Chain',
       nativeCurrency: {

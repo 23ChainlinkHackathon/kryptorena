@@ -27,12 +27,11 @@ const PageHOC = (Component, title, description) => () => {
           <Component />
         </div>
 
-        <p className={styles.footerText}>Made with 💜 by ERB</p>
+        <p className={styles.footerText}>Made with 💜 by ERDB</p>
       </div>
 
       <div className="flex flex-1">
         <img src={heroImg} alt="hero-img" className="w-full xl:h-full object-cover" />
-        {/* <video src ={heroImg} className='w-full sl:h-full object-cover'></video> */}
       </div>
     </div>
   );

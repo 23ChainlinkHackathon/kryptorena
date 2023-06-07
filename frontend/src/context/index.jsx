@@ -10,7 +10,7 @@ import { createEventListeners } from './createEventListeners';
 const GlobalContext = createContext();
 
 export const GlobalContextProvider = ({ children }) => {
-  const [walletAddress, setWalletAddress] = useState(''); //to be sent to smartcontract and vice versa
+  const [walletAddress, setWalletAddress] = useState('');
   const [battleGround, setBattleGround] = useState('bg-astral');
   const [contract, setContract] = useState(null);
   const [provider, setProvider] = useState(null);

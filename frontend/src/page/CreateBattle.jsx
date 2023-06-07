@@ -44,7 +44,6 @@ const CreateBattle = () => {
 
         <CustomButton
           title="Create Battle"
-          
           handleClick={handleClick}
           restStyles="mt-6"
         />

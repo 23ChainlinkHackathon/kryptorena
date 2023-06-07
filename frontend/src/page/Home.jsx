@@ -51,7 +51,7 @@ const Home = () => {
       <div className="flex flex-col">
         <CustomInput
           label="Name"
-          placeHolder="Enter your name"
+          placeHolder="Enter your player name"
           value={playerName}
           handleValueChange={setPlayerName}
         />
@@ -69,10 +69,9 @@ const Home = () => {
 export default PageHOC(
   Home,
   <>
-    Welcome to KRYPTORENA <br /> 
+    Welcome to kryptorena <br />
   </>,
   <>
-    Connect your wallet to start playing <br /> 
+    Connect your wallet to start playing <br />
   </>,
 );
-
