@@ -162,7 +162,7 @@ contract Kryptorena is ERC1155, Ownable, ERC1155Supply {
         uint256 _id = players.length;
         players.push(Player(msg.sender, _name, 10, 25, false));
         playerInfo[msg.sender] = _id;
-        i_kryptorenaNft.requestNft{value: msg.value}(msg.sender);
+        i_kryptorenaNft.requestNft(msg.sender);
 
         createRandomGameToken(_gameTokenName);
 
