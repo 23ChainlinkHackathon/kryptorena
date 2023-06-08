@@ -15,3 +15,5 @@ once the installation completes, run: npm run dev
 _____________________
 
 workflow and designs: https://www.figma.com/file/xgezqsx6hgyVWAwKRxKt9B/Kryptorena---Chainlink-Hackathon-2023?type=design&node-id=0-1
+
+Deployed project: https://kryptorena-landing.vercel.app/
