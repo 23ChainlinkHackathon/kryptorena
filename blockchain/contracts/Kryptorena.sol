@@ -5,9 +5,10 @@ pragma solidity ^0.8.16;
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
-
+import "./KryptorenaNft.sol";
 
 contract Kryptorena is ERC1155, Ownable, ERC1155Supply {
+    KryptorenaNft public i_kryptorenaNft;
     string public baseURI;
     uint256 public totalSupply;
     uint256 public constant DEVIL = 0;
@@ -152,9 +153,9 @@ contract Kryptorena is ERC1155, Ownable, ERC1155Supply {
         );
     }
 
-    // function linkNftContract(address _kryptorenaNftAddress) public {
-    //     i_kryptorenaNft = KryptorenaNft(_kryptorenaNftAddress);
-    // }
+    function linkNftContract(address _kryptorenaNftAddress) public {
+        i_kryptorenaNft = KryptorenaNft(_kryptorenaNftAddress);
+    }
 
     function registerPlayer(string memory _name, string memory _gameTokenName) external payable {
         require(!isPlayer(msg.sender), "Player already registered");
@@ -162,9 +163,9 @@ contract Kryptorena is ERC1155, Ownable, ERC1155Supply {
         players.push(Player(msg.sender, _name, 10, 25, false));
         playerInfo[msg.sender] = _id;
         createRandomGameToken(_gameTokenName);
-        // address _nftContractAdd =0x46c3f21F51EF332EFEbcDa6f1a09C82AD0ea4957;
-        // linkNftContract(_nftContractAdd);
-        // i_kryptorenaNft.requestNft(msg.sender);
+        address _nftContractAdd =0x46c3f21F51EF332EFEbcDa6f1a09C82AD0ea4957;
+        linkNftContract(_nftContractAdd);
+        i_kryptorenaNft.requestNft(msg.sender);
         emit NewPlayer(msg.sender, _name);
     }
 
