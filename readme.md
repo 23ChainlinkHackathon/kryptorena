@@ -21,4 +21,4 @@ Deployed project: https://kryptorena-landing.vercel.app/
 
 
 
-Check out this docs for the games official docs: https://docs.google.com/document/d/1_Z99R6ohIAH4mS2FmCSRXBeu97Ei8PAPNq-aJ2mjvBw/edit#
+Check out this docs for the games official docs: https://docs.google.com/document/d/1_Z99R6ohIAH4mS2FmCSRXBeu97Ei8PAPNq-aJ2mjvBw/edit?usp=sharing
